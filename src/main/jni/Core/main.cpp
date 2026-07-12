@@ -46,15 +46,23 @@ std::string GetProp(const char* key) {
     return std::string(value);
 }
 
+// FIX #1: Simpan pointer sekali saja, bukan resolve tiap frame
+static int (*TouchCount)(void*) = nullptr;
+
 void SetupImgui() {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
+
     int(*get_width)(void*);
     int(*get_height)(void*);
     get_width  = (int (*)(void*)) Il2CppGetMethodOffset("UnityEngine.dll", "UnityEngine", "Screen", "get_width",  0);
     get_height = (int (*)(void*)) Il2CppGetMethodOffset("UnityEngine.dll", "UnityEngine", "Screen", "get_height", 0);
-    io.DisplaySize = ImVec2((float)get_width(0), (float)get_height(0));
+
+    // FIX #2: Null check sebelum panggil get_width/get_height
+    float w = (get_width  && get_width(0)  > 0) ? (float)get_width(0)  : 1280.0f;
+    float h = (get_height && get_height(0) > 0) ? (float)get_height(0) : 720.0f;
+    io.DisplaySize = ImVec2(w, h);
 
     ImGui::StyleColorsDark();
     ImGuiStyle *style = &ImGui::GetStyle();
@@ -66,6 +74,9 @@ void SetupImgui() {
     io.Fonts->AddFontFromMemoryTTF(&Roboto_Regular, sizeof(Roboto_Regular), 32.0f, &font_cfg,
                                     io.Fonts->GetGlyphRangesCyrillic());
     ImGui::GetStyle().ScaleAllSizes(3.0f);
+
+    // FIX #1: Resolve TouchCount sekali di sini saja
+    TouchCount = (int (*)(void*)) Il2CppGetMethodOffset("UnityEngine.dll", "UnityEngine", "Input", "get_touchCount", 0);
 }
 
 bool clearMousePos = true;
@@ -104,7 +115,6 @@ bool get_m_CanSight(void* instance) {
 
 // ─────────────────────────────────────────────
 // [2] Speed Hack — LogicFighter::GetMoveSpeed
-// dump.cs: 0xffffffff8bca0bb8
 // ─────────────────────────────────────────────
 bool  IsSpeedHack     = false;
 float SpeedMultiplier = 2.5f;
@@ -117,7 +127,6 @@ double myGetMoveSpeed(void* thiz, bool bSummonOwner) {
 
 // ─────────────────────────────────────────────
 // [3] God Mode — LogicFighter::BeAtkModifyHP
-// dump.cs: 0xffffffff8c585d6c
 // ─────────────────────────────────────────────
 bool IsGodMode = false;
 void (*oldBeAtkModifyHP)(void* thiz, int value, void* pAtk);
@@ -128,7 +137,6 @@ void myBeAtkModifyHP(void* thiz, int value, void* pAtk) {
 
 // ─────────────────────────────────────────────
 // [4] No Cooldown — LogicFighter::CalcSkillCoolDown
-// dump.cs: 0xffffffff8c577c50
 // ─────────────────────────────────────────────
 bool IsNoCD = false;
 int (*oldCalcSkillCoolDown)(void* thiz, int iCoolDownTime, int iSpellId);
@@ -180,20 +188,22 @@ EGLBoolean hook_eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
 
     ImGuiIO &io = ImGui::GetIO();
 
-    int (*TouchCount)(void*) = (int (*)(void*)) Il2CppGetMethodOffset("UnityEngine.dll", "UnityEngine", "Input", "get_touchCount", 0);
-    int touchCount = TouchCount(nullptr);
-    if (touchCount > 0) {
-        should_clear_mouse_pos = false;
-    } else {
-        should_clear_mouse_pos = true;
+    // FIX #1: Gunakan pointer yang sudah di-resolve sekali di SetupImgui()
+    // FIX #2: Null check sebelum panggil TouchCount
+    if (TouchCount != nullptr) {
+        int touchCount = TouchCount(nullptr);
+        should_clear_mouse_pos = (touchCount <= 0);
     }
 
     ImGui_ImplOpenGL3_NewFrame();
     ImGui::NewFrame();
     DrawMenu();
+
+    // FIX #3: Render() sudah memanggil EndFrame() secara internal
+    // JANGAN panggil EndFrame() lagi setelah Render() — ini menyebabkan double-call crash
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-    ImGui::EndFrame();
+    // REMOVED: ImGui::EndFrame(); <-- ini yang menyebabkan loading stuck
 
     if (should_clear_mouse_pos) {
         io.MousePos = ImVec2(-1, -1);
@@ -229,20 +239,20 @@ void *hack_thread(void*) {
     sleep(5);
 
     // [1] Map Hack
-    DobbyHook((void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "EntityBase",   "get_m_CanSight",     0),
-              (void*)get_m_CanSight,       (void**)&old_get_m_CanSight);
+    void* addr1 = (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "EntityBase",   "get_m_CanSight",    0);
+    if (addr1) DobbyHook(addr1, (void*)get_m_CanSight,       (void**)&old_get_m_CanSight);
 
     // [2] Speed Hack
-    DobbyHook((void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "GetMoveSpeed",       1),
-              (void*)myGetMoveSpeed,       (void**)&oldGetMoveSpeed);
+    void* addr2 = (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "GetMoveSpeed",      1);
+    if (addr2) DobbyHook(addr2, (void*)myGetMoveSpeed,       (void**)&oldGetMoveSpeed);
 
     // [3] God Mode
-    DobbyHook((void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "BeAtkModifyHP",      2),
-              (void*)myBeAtkModifyHP,      (void**)&oldBeAtkModifyHP);
+    void* addr3 = (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "BeAtkModifyHP",     2);
+    if (addr3) DobbyHook(addr3, (void*)myBeAtkModifyHP,      (void**)&oldBeAtkModifyHP);
 
     // [4] No Cooldown
-    DobbyHook((void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "CalcSkillCoolDown",  2),
-              (void*)myCalcSkillCoolDown,  (void**)&oldCalcSkillCoolDown);
+    void* addr4 = (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "CalcSkillCoolDown", 2);
+    if (addr4) DobbyHook(addr4, (void*)myCalcSkillCoolDown,  (void**)&oldCalcSkillCoolDown);
 
     pthread_exit(nullptr);
 }
