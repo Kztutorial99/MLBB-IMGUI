@@ -9,8 +9,7 @@
 #include <sstream>
 #include <iomanip>
 #include <cctype>
-#include <cstring> // for strcmp
-#include <sstream>
+#include <cstring>
 #include <array>
 #include <unistd.h>
 #include <sys/system_properties.h>
@@ -27,7 +26,6 @@
 #include "Roboto-Regular.h"
 #include "Icon.h"
 #include "Iconcpp.h"
-
 
 bool setup;
 using namespace ImGui;
@@ -54,55 +52,44 @@ void SetupImgui() {
     ImGuiIO& io = ImGui::GetIO();
     int(*get_width)(void*);
     int(*get_height)(void*);
-    get_width = (int (*)(void*)) Il2CppGetMethodOffset("UnityEngine.dll", "UnityEngine", "Screen", "get_width", 0);
+    get_width  = (int (*)(void*)) Il2CppGetMethodOffset("UnityEngine.dll", "UnityEngine", "Screen", "get_width",  0);
     get_height = (int (*)(void*)) Il2CppGetMethodOffset("UnityEngine.dll", "UnityEngine", "Screen", "get_height", 0);
     io.DisplaySize = ImVec2((float)get_width(0), (float)get_height(0));
 
     ImGui::StyleColorsDark();
     ImGuiStyle *style = &ImGui::GetStyle();
     style->Alpha = 1.0f;
-    style->WindowTitleAlign = ImVec2(0.5, 0.5);
+    style->WindowTitleAlign = ImVec2(0.5f, 0.5f);
     ImGui_ImplOpenGL3_Init("#version 100");
 
     ImFontConfig font_cfg;
-    io.Fonts->AddFontFromMemoryTTF(&Roboto_Regular, sizeof(Roboto_Regular), 32.0, &font_cfg, io.Fonts->GetGlyphRangesCyrillic());
+    io.Fonts->AddFontFromMemoryTTF(&Roboto_Regular, sizeof(Roboto_Regular), 32.0f, &font_cfg,
+                                    io.Fonts->GetGlyphRangesCyrillic());
     ImGui::GetStyle().ScaleAllSizes(3.0f);
 }
 
-
 bool clearMousePos = true;
-struct UnityEngine_Vector2_Fields {
-    float x;
-    float y;
-};
 
-struct UnityEngine_Vector2_o {
-    UnityEngine_Vector2_Fields fields;
-};
+struct UnityEngine_Vector2_Fields { float x; float y; };
+struct UnityEngine_Vector2_o { UnityEngine_Vector2_Fields fields; };
 
-enum TouchPhase {
-    Began = 0,
-    Moved = 1,
-    Stationary = 2,
-    Ended = 3,
-    Canceled = 4
-};
+enum TouchPhase { Began = 0, Moved = 1, Stationary = 2, Ended = 3, Canceled = 4 };
 
 struct UnityEngine_Touch_Fields {
     int32_t m_FingerId;
-    struct UnityEngine_Vector2_o m_Position;
-    struct UnityEngine_Vector2_o m_RawPosition;
-    struct UnityEngine_Vector2_o m_PositionDelta;
-    float m_TimeDelta;
+    UnityEngine_Vector2_o m_Position;
+    UnityEngine_Vector2_o m_RawPosition;
+    UnityEngine_Vector2_o m_PositionDelta;
+    float   m_TimeDelta;
     int32_t m_TapCount;
     int32_t m_Phase;
     int32_t m_Type;
-    float m_Pressure;
-    float m_maximumPossiblePressure;
-    float m_Radius;
-    float m_fRadiusVariance;
-    float m_AltitudeAngle;
-    float m_AzimuthAngle;
+    float   m_Pressure;
+    float   m_maximumPossiblePressure;
+    float   m_Radius;
+    float   m_fRadiusVariance;
+    float   m_AltitudeAngle;
+    float   m_AzimuthAngle;
 };
 
 // ─────────────────────────────────────────────
@@ -111,17 +98,15 @@ struct UnityEngine_Touch_Fields {
 bool Isget_m_CanSight = false;
 bool (*old_get_m_CanSight)(void* instance);
 bool get_m_CanSight(void* instance) {
-    if (instance != NULL) {
-        if (Isget_m_CanSight) return true;
-    }
+    if (instance != NULL && Isget_m_CanSight) return true;
     return old_get_m_CanSight(instance);
 }
 
 // ─────────────────────────────────────────────
 // [2] Speed Hack — LogicFighter::GetMoveSpeed
-// Source: dump.cs offset 0xffffffff8bca0bb8
+// dump.cs: 0xffffffff8bca0bb8
 // ─────────────────────────────────────────────
-bool IsSpeedHack = false;
+bool  IsSpeedHack     = false;
 float SpeedMultiplier = 2.5f;
 double (*oldGetMoveSpeed)(void* thiz, bool bSummonOwner);
 double myGetMoveSpeed(void* thiz, bool bSummonOwner) {
@@ -132,18 +117,18 @@ double myGetMoveSpeed(void* thiz, bool bSummonOwner) {
 
 // ─────────────────────────────────────────────
 // [3] God Mode — LogicFighter::BeAtkModifyHP
-// Source: dump.cs offset 0xffffffff8c585d6c
+// dump.cs: 0xffffffff8c585d6c
 // ─────────────────────────────────────────────
 bool IsGodMode = false;
 void (*oldBeAtkModifyHP)(void* thiz, int value, void* pAtk);
 void myBeAtkModifyHP(void* thiz, int value, void* pAtk) {
-    if (IsGodMode && value < 0) return; // block incoming damage
+    if (IsGodMode && value < 0) return;
     oldBeAtkModifyHP(thiz, value, pAtk);
 }
 
 // ─────────────────────────────────────────────
 // [4] No Cooldown — LogicFighter::CalcSkillCoolDown
-// Source: dump.cs offset 0xffffffff8c577c50
+// dump.cs: 0xffffffff8c577c50
 // ─────────────────────────────────────────────
 bool IsNoCD = false;
 int (*oldCalcSkillCoolDown)(void* thiz, int iCoolDownTime, int iSpellId);
@@ -160,28 +145,28 @@ void DrawMenu() {
     ImGui::SetNextWindowSize(window_size, ImGuiCond_Once);
     ImGui::Begin("IMGUI MODMENU", nullptr);
 
-    // === MAP ===
     if (ImGui::CollapsingHeader("Map", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Checkbox("Map Hack", &Isget_m_CanSight);
     }
 
-    // === BATTLE ===
     if (ImGui::CollapsingHeader("Battle", ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::Checkbox("God Mode", &IsGodMode);
+        ImGui::Checkbox("God Mode",    &IsGodMode);
         ImGui::Checkbox("No Cooldown", &IsNoCD);
     }
 
-    // === MOVEMENT ===
     if (ImGui::CollapsingHeader("Movement", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Checkbox("Speed Hack", &IsSpeedHack);
         if (IsSpeedHack) {
-            ImGui::SliderFloat("Speed Multiplier", &SpeedMultiplier, 1.0f, 5.0f);
+            ImGui::SliderFloat("Speed x", &SpeedMultiplier, 1.0f, 5.0f);
         }
     }
 
     ImGui::End();
 }
 
+// ─────────────────────────────────────────────
+// EGL SWAP BUFFERS HOOK
+// ─────────────────────────────────────────────
 EGLBoolean (*old_eglSwapBuffers)(EGLDisplay dpy, EGLSurface surface);
 EGLBoolean hook_eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
 
@@ -194,33 +179,44 @@ EGLBoolean hook_eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
     }
 
     ImGuiIO &io = ImGui::GetIO();
+
     int (*TouchCount)(void*) = (int (*)(void*)) Il2CppGetMethodOffset("UnityEngine.dll", "UnityEngine", "Input", "get_touchCount", 0);
     int touchCount = TouchCount(nullptr);
     if (touchCount > 0) {
-...
+        should_clear_mouse_pos = false;
+    } else {
+        should_clear_mouse_pos = true;
+    }
+
     ImGui_ImplOpenGL3_NewFrame();
     ImGui::NewFrame();
     DrawMenu();
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     ImGui::EndFrame();
+
     if (should_clear_mouse_pos) {
         io.MousePos = ImVec2(-1, -1);
         should_clear_mouse_pos = false;
     }
+
     return old_eglSwapBuffers(dpy, surface);
 }
 
-
+// ─────────────────────────────────────────────
+// THREADS
+// ─────────────────────────────────────────────
 void *imgui_go(void*) {
-    void *handle_egl = xdl_open("libEGL.so", XDL_DEFAULT);
-    void *handle_input = xdl_open("libinput.so", XDL_DEFAULT);
+    void *handle_egl   = xdl_open("libEGL.so",   XDL_DEFAULT);
+    void *handle_input = xdl_open("libinput.so",  XDL_DEFAULT);
 
-    void *xdl_sym_egl = xdl_sym(handle_egl, "eglSwapBuffers", nullptr);
-    void *xdl_sym_input = xdl_sym(handle_input, "_ZN7android13InputConsumer21initializeMotionEventEPNS_11MotionEventEPKNS_12InputMessageE", nullptr);
+    void *xdl_sym_egl   = xdl_sym(handle_egl,   "eglSwapBuffers", nullptr);
+    void *xdl_sym_input = xdl_sym(handle_input,
+        "_ZN7android13InputConsumer21initializeMotionEventEPNS_11MotionEventEPKNS_12InputMessageE",
+        nullptr);
 
-    DobbyHook(xdl_sym_egl, (void*)hook_eglSwapBuffers, (void**)&old_eglSwapBuffers);
-    DobbyHook(xdl_sym_input, (void*)myInput, (void**)&origInput);
+    DobbyHook(xdl_sym_egl,   (void*)hook_eglSwapBuffers, (void**)&old_eglSwapBuffers);
+    DobbyHook(xdl_sym_input,  (void*)myInput,             (void**)&origInput);
 
     pthread_exit(nullptr);
 }
@@ -233,20 +229,20 @@ void *hack_thread(void*) {
     sleep(5);
 
     // [1] Map Hack
-    DobbyHook((void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "EntityBase", "get_m_CanSight", 0),
-        (void*)get_m_CanSight, (void**)&old_get_m_CanSight);
+    DobbyHook((void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "EntityBase",   "get_m_CanSight",     0),
+              (void*)get_m_CanSight,       (void**)&old_get_m_CanSight);
 
     // [2] Speed Hack
-    DobbyHook((void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "GetMoveSpeed", 1),
-        (void*)myGetMoveSpeed, (void**)&oldGetMoveSpeed);
+    DobbyHook((void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "GetMoveSpeed",       1),
+              (void*)myGetMoveSpeed,       (void**)&oldGetMoveSpeed);
 
     // [3] God Mode
-    DobbyHook((void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "BeAtkModifyHP", 2),
-        (void*)myBeAtkModifyHP, (void**)&oldBeAtkModifyHP);
+    DobbyHook((void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "BeAtkModifyHP",      2),
+              (void*)myBeAtkModifyHP,      (void**)&oldBeAtkModifyHP);
 
     // [4] No Cooldown
-    DobbyHook((void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "CalcSkillCoolDown", 2),
-        (void*)myCalcSkillCoolDown, (void**)&oldCalcSkillCoolDown);
+    DobbyHook((void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "CalcSkillCoolDown",  2),
+              (void*)myCalcSkillCoolDown,  (void**)&oldCalcSkillCoolDown);
 
     pthread_exit(nullptr);
 }
@@ -254,7 +250,7 @@ void *hack_thread(void*) {
 __attribute__((constructor))
 void lib_main() {
     pthread_t hacks;
-    pthread_create(&hacks, NULL, imgui_go, NULL);
+    pthread_create(&hacks, NULL, imgui_go,    NULL);
     pthread_create(&hacks, NULL, hack_thread, NULL);
 }
 
