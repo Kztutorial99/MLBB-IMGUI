@@ -9,8 +9,7 @@
 #include <sstream>
 #include <iomanip>
 #include <cctype>
-#include <cstring> // for strcmp
-#include <sstream>
+#include <cstring>
 #include <array>
 #include <unistd.h>
 #include <sys/system_properties.h>
@@ -28,48 +27,9 @@
 #include "Icon.h"
 #include "Iconcpp.h"
 
-
-bool setup;
 using namespace ImGui;
 
-#define HOOKAF(ret, func, ...) \
-    ret (*orig##func)(__VA_ARGS__); \
-    ret my##func(__VA_ARGS__)
-
-HOOKAF(void, Input, void *thiz, void *ex_ab, void *ex_ac) {
-    origInput(thiz, ex_ab, ex_ac);
-    ImGui_ImplAndroid_HandleInputEvent((AInputEvent*)thiz);
-    return;
-}
-
-std::string GetProp(const char* key) {
-    char value[PROP_VALUE_MAX];
-    __system_property_get(key, value);
-    return std::string(value);
-}
-
-void SetupImgui() {
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    int(*get_width)(void*);
-    int(*get_height)(void*);
-    get_width = (int (*)(void*)) Il2CppGetMethodOffset("UnityEngine.dll", "UnityEngine", "Screen", "get_width", 0);
-    get_height = (int (*)(void*)) Il2CppGetMethodOffset("UnityEngine.dll", "UnityEngine", "Screen", "get_height", 0);
-    io.DisplaySize = ImVec2((float)get_width(0), (float)get_height(0));
-
-ImGui::StyleColorsDark();
-ImGuiStyle *style = &ImGui::GetStyle();
-style->Alpha = 1.0f;
-style->WindowTitleAlign = ImVec2(0.5, 0.5);
-    ImGui_ImplOpenGL3_Init("#version 100");
-
-    ImFontConfig font_cfg;
-    io.Fonts->AddFontFromMemoryTTF(&Roboto_Regular, sizeof(Roboto_Regular), 32.0, &font_cfg, io.Fonts->GetGlyphRangesCyrillic());
-    ImGui::GetStyle().ScaleAllSizes(3.0f);
-}
-
-bool clearMousePos = true;
+// ── Unity Touch Structs ───────────────────────────────────────
 struct UnityEngine_Vector2_Fields { float x; float y; };
 struct UnityEngine_Vector2_o { UnityEngine_Vector2_Fields fields; };
 enum TouchPhase { Began=0, Moved=1, Stationary=2, Ended=3, Canceled=4 };
@@ -90,133 +50,297 @@ struct UnityEngine_Touch_Fields {
     float m_AzimuthAngle;
 };
 
-// ── [1] Map Hack ─────────────────────────────────────────────
-// dump.cs: public virtual Boolean get_m_CanSight(); // argsCount=0
-bool Isget_m_CanSight = false;
-bool (*old_get_m_CanSight)(void* instance);
-bool get_m_CanSight(void* instance) {
-    if (instance != NULL) {
-        if (Isget_m_CanSight) {
-            return true;
-        }
-    }
-    return old_get_m_CanSight(instance);
+// ── Safe DobbyHook Helper ─────────────────────────────────────
+// Mencegah hook ke alamat 0 (null) yang bisa menyebabkan FC
+static void SafeHook(void* addr, void* replace, void** origin) {
+    if (addr == nullptr || addr == (void*)0) return;
+    DobbyHook(addr, replace, origin);
 }
 
-// ── [2] Speed Hack ───────────────────────────────────────────
-// dump.cs: public Double GetMoveSpeed(Boolean bSummonOwner); // argsCount=1
+// ── [1] Map Hack ─────────────────────────────────────────────
+// dump.cs: EntityBase.get_m_CanSight() : Boolean — argsCount=0
+bool IsMapHack = false;
+bool (*old_get_m_CanSight)(void* thiz);
+bool my_get_m_CanSight(void* thiz) {
+    if (thiz != nullptr && IsMapHack) return true;
+    return old_get_m_CanSight(thiz);
+}
+
+// ── [2] Speed Hack ────────────────────────────────────────────
+// dump.cs: LogicFighter.GetMoveSpeed(Boolean bSummonOwner) : Double — argsCount=1
 bool IsSpeedHack = false;
 float SpeedMultiplier = 2.5f;
 double (*old_GetMoveSpeed)(void* thiz, bool bSummonOwner);
 double my_GetMoveSpeed(void* thiz, bool bSummonOwner) {
-    if (thiz != NULL && IsSpeedHack) {
-        return old_GetMoveSpeed(thiz, bSummonOwner) * (double)SpeedMultiplier;
+    if (thiz != nullptr && IsSpeedHack) {
+        double base = old_GetMoveSpeed(thiz, bSummonOwner);
+        return base * (double)SpeedMultiplier;
     }
     return old_GetMoveSpeed(thiz, bSummonOwner);
 }
 
+// ── [3] Attack Range Hack ─────────────────────────────────────
+// dump.cs: LogicFighter.GetAttackRange() : Double — argsCount=0
+bool IsAttackRange = false;
+float AttackRangeMultiplier = 3.0f;
+double (*old_GetAttackRange)(void* thiz);
+double my_GetAttackRange(void* thiz) {
+    if (thiz != nullptr && IsAttackRange) {
+        return old_GetAttackRange(thiz) * (double)AttackRangeMultiplier;
+    }
+    return old_GetAttackRange(thiz);
+}
+
+// ── [4] Attack Speed Hack ─────────────────────────────────────
+// dump.cs: LogicFighter.GetBasicAtkCd() : Double — argsCount=0
+// Return nilai kecil = cooldown pendek = serangan makin cepat
+bool IsAttackSpeed = false;
+double (*old_GetBasicAtkCd)(void* thiz);
+double my_GetBasicAtkCd(void* thiz) {
+    if (thiz != nullptr && IsAttackSpeed) {
+        return 0.01; // ~instant basic attack cooldown
+    }
+    return old_GetBasicAtkCd(thiz);
+}
+
+// ── [5] Drone View (Camera Zoom) ──────────────────────────────
+// dump.cs: BaseCameraLogic.GetMaxDistance() : Double — argsCount=0
+bool IsDroneView = false;
+float DroneDistance = 2.5f;
+double (*old_GetMaxDistance)(void* thiz);
+double my_GetMaxDistance(void* thiz) {
+    if (thiz != nullptr && IsDroneView) {
+        return old_GetMaxDistance(thiz) * (double)DroneDistance;
+    }
+    return old_GetMaxDistance(thiz);
+}
+
+// ── [6] No Mana Cost ──────────────────────────────────────────
+// dump.cs: LogicFighter.GetSkillMp(Int32 skillIndex) : Double — argsCount=1
+// Return 0 = skill tidak butuh mana
+bool IsNoMana = false;
+double (*old_GetSkillMp)(void* thiz, int32_t skillIndex);
+double my_GetSkillMp(void* thiz, int32_t skillIndex) {
+    if (thiz != nullptr && IsNoMana) return 0.0;
+    return old_GetSkillMp(thiz, skillIndex);
+}
+
+// ── [7] Anti AFK ─────────────────────────────────────────────
+// dump.cs: EntityBase.get_IsAFK() : Boolean — argsCount=0
+// Return false = karakter tidak dianggap AFK
+bool IsAntiAFK = false;
+bool (*old_get_IsAFK)(void* thiz);
+bool my_get_IsAFK(void* thiz) {
+    if (thiz != nullptr && IsAntiAFK) return false;
+    return old_get_IsAFK(thiz);
+}
+
 // ── MENU ─────────────────────────────────────────────────────
 void DrawMenu() {
-    const ImVec2 window_size = ImVec2(700, 600);
-    ImGui::SetNextWindowSize(window_size, ImGuiCond_Once);
-    ImGui::Begin("IMGUI MODMENU", nullptr);
+    ImGui::SetNextWindowSize(ImVec2(750, 750), ImGuiCond_Once);
+    ImGui::Begin("MLBB MOD MENU", nullptr,
+        ImGuiWindowFlags_NoCollapse);
 
-    if (ImGui::CollapsingHeader("Map", ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::Checkbox("Map Hack", &Isget_m_CanSight);
+    // ── Map ──
+    if (ImGui::CollapsingHeader("  Map", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Checkbox("Map Hack", &IsMapHack);
     }
 
-    if (ImGui::CollapsingHeader("Movement", ImGuiTreeNodeFlags_DefaultOpen)) {
+    // ── Movement ──
+    if (ImGui::CollapsingHeader("  Movement", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Checkbox("Speed Hack", &IsSpeedHack);
         if (IsSpeedHack) {
-            ImGui::SliderFloat("Speed x", &SpeedMultiplier, 1.0f, 5.0f);
+            ImGui::SliderFloat("Speed Multiplier", &SpeedMultiplier, 1.0f, 5.0f);
         }
+    }
+
+    // ── Combat ──
+    if (ImGui::CollapsingHeader("  Combat", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Checkbox("Attack Range Hack", &IsAttackRange);
+        if (IsAttackRange) {
+            ImGui::SliderFloat("Range Multiplier", &AttackRangeMultiplier, 1.0f, 6.0f);
+        }
+        ImGui::Separator();
+        ImGui::Checkbox("Attack Speed Hack", &IsAttackSpeed);
+        ImGui::Separator();
+        ImGui::Checkbox("No Mana Cost", &IsNoMana);
+    }
+
+    // ── Camera ──
+    if (ImGui::CollapsingHeader("  Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Checkbox("Drone View", &IsDroneView);
+        if (IsDroneView) {
+            ImGui::SliderFloat("Drone Distance", &DroneDistance, 1.0f, 5.0f);
+        }
+    }
+
+    // ── Misc ──
+    if (ImGui::CollapsingHeader("  Misc", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Checkbox("Anti AFK", &IsAntiAFK);
     }
 
     ImGui::End();
 }
 
-// ── EGL SWAP BUFFERS ─────────────────────────────────────────
-EGLBoolean (*old_eglSwapBuffers)(EGLDisplay dpy, EGLSurface surface);
+// ── SETUP IMGUI ──────────────────────────────────────────────
+void SetupImgui() {
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+
+    // Ambil resolusi layar dari Unity
+    int (*get_width)(void*)  = (int(*)(void*)) Il2CppGetMethodOffset("UnityEngine.dll", "UnityEngine", "Screen", "get_width",  0);
+    int (*get_height)(void*) = (int(*)(void*)) Il2CppGetMethodOffset("UnityEngine.dll", "UnityEngine", "Screen", "get_height", 0);
+    if (get_width && get_height) {
+        io.DisplaySize = ImVec2((float)get_width(nullptr), (float)get_height(nullptr));
+    }
+
+    ImGui::StyleColorsDark();
+    ImGuiStyle* style = &ImGui::GetStyle();
+    style->Alpha            = 1.0f;
+    style->WindowTitleAlign = ImVec2(0.5f, 0.5f);
+    style->WindowRounding   = 8.0f;
+    style->FrameRounding    = 5.0f;
+    style->GrabRounding     = 5.0f;
+
+    ImGui_ImplOpenGL3_Init("#version 100");
+
+    ImFontConfig font_cfg;
+    io.Fonts->AddFontFromMemoryTTF(
+        &Roboto_Regular, sizeof(Roboto_Regular), 30.0f,
+        &font_cfg, io.Fonts->GetGlyphRangesCyrillic()
+    );
+    ImGui::GetStyle().ScaleAllSizes(3.0f);
+}
+
+// ── EGL SWAP BUFFERS (Render Loop) ───────────────────────────
+EGLBoolean (*old_eglSwapBuffers)(EGLDisplay, EGLSurface);
 EGLBoolean hook_eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
 
     static bool is_setup = false;
-    static bool should_clear_mouse_pos = false;
-
     if (!is_setup) {
         SetupImgui();
         is_setup = true;
     }
 
-    ImGuiIO &io = ImGui::GetIO();
-    int (*TouchCount)(void*) = (int (*)(void*)) Il2CppGetMethodOffset("UnityEngine.dll", "UnityEngine", "Input", "get_touchCount", 0);
-    int touchCount = TouchCount(nullptr);
-    if (touchCount > 0) {
-        should_clear_mouse_pos = false;
-    } else {
-        should_clear_mouse_pos = true;
+    // ── Input via Unity Touch API ─────────────────────────────
+    // FIX: Tidak pakai AInputEvent casting yang salah.
+    // Gunakan Unity Input.GetTouch() langsung — koordinat sudah
+    // dalam ruang layar yang sama dengan ImGui DisplaySize.
+    static int (*fn_TouchCount)(void*) = nullptr;
+    static UnityEngine_Touch_Fields (*fn_GetTouch)(void*, int32_t) = nullptr;
+    if (!fn_TouchCount) {
+        fn_TouchCount = (int(*)(void*)) Il2CppGetMethodOffset(
+            "UnityEngine.dll", "UnityEngine", "Input", "get_touchCount", 0);
+        fn_GetTouch = (UnityEngine_Touch_Fields(*)(void*, int32_t)) Il2CppGetMethodOffset(
+            "UnityEngine.dll", "UnityEngine", "Input", "GetTouch", 1);
     }
+
+    ImGuiIO& io = ImGui::GetIO();
+
+    if (fn_TouchCount && fn_GetTouch) {
+        int touchCount = fn_TouchCount(nullptr);
+        if (touchCount > 0) {
+            UnityEngine_Touch_Fields touch = fn_GetTouch(nullptr, 0);
+            // Unity Y=0 di bawah layar, ImGui Y=0 di atas → flip
+            float fy = io.DisplaySize.y - touch.m_Position.fields.y;
+            io.MousePos = ImVec2(touch.m_Position.fields.x, fy);
+            io.MouseDown[0] = (touch.m_Phase == Began    ||
+                               touch.m_Phase == Moved    ||
+                               touch.m_Phase == Stationary);
+        } else {
+            io.MouseDown[0] = false;
+            io.MousePos     = ImVec2(-1.0f, -1.0f);
+        }
+    }
+
+    // ── Render ───────────────────────────────────────────────
     ImGui_ImplOpenGL3_NewFrame();
     ImGui::NewFrame();
     DrawMenu();
-    ImGui::Render();
+    ImGui::Render();                                   // implicitly calls EndFrame()
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-    ImGui::EndFrame();
-    if (should_clear_mouse_pos) {
-        io.MousePos = ImVec2(-1, -1);
-        should_clear_mouse_pos = false;
-    }
+    // JANGAN panggil ImGui::EndFrame() setelah Render() — sudah otomatis
+
     return old_eglSwapBuffers(dpy, surface);
 }
 
-// ── THREADS ──────────────────────────────────────────────────
-void *imgui_go(void*) {
-    void *handle_egl   = xdl_open("libEGL.so",   XDL_DEFAULT);
-    void *handle_input = xdl_open("libinput.so",  XDL_DEFAULT);
-
-    void *xdl_sym_egl   = xdl_sym(handle_egl, "eglSwapBuffers", nullptr);
-    void *xdl_sym_input = xdl_sym(handle_input,
-        "_ZN7android13InputConsumer21initializeMotionEventEPNS_11MotionEventEPKNS_12InputMessageE",
-        nullptr);
-
-    DobbyHook(xdl_sym_egl,   (void*)hook_eglSwapBuffers, (void**)&old_eglSwapBuffers);
-    DobbyHook(xdl_sym_input, (void*)myInput,              (void**)&origInput);
-
+// ── IMGUI THREAD (EGL hook only, input sudah pakai Unity Touch) ──
+void* imgui_go(void*) {
+    void* handle_egl  = xdl_open("libEGL.so", XDL_DEFAULT);
+    void* sym_egl     = xdl_sym(handle_egl, "eglSwapBuffers", nullptr);
+    DobbyHook(sym_egl, (void*)hook_eglSwapBuffers, (void**)&old_eglSwapBuffers);
     pthread_exit(nullptr);
 }
 
-void *hack_thread(void*) {
-    do {
-        libBaseAddress = findLibrary(LIB);
-    } while (libBaseAddress == 0);
+// ── HACK THREAD (semua game hook di sini) ────────────────────
+void* hack_thread(void*) {
+    do { libBaseAddress = findLibrary(LIB); } while (libBaseAddress == 0);
     Il2CppAttach("liblogic.so");
     sleep(5);
 
-    // [1] Map Hack — EntityBase::get_m_CanSight, argsCount=0
-    DobbyHook(
+    // [1] Map Hack
+    SafeHook(
         (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "EntityBase", "get_m_CanSight", 0),
-        (void*)get_m_CanSight,
+        (void*)my_get_m_CanSight,
         (void**)&old_get_m_CanSight
     );
 
-    // [2] Speed Hack — LogicFighter::GetMoveSpeed, argsCount=1
-    DobbyHook(
+    // [2] Speed Hack
+    SafeHook(
         (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "GetMoveSpeed", 1),
         (void*)my_GetMoveSpeed,
         (void**)&old_GetMoveSpeed
     );
 
+    // [3] Attack Range Hack
+    SafeHook(
+        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "GetAttackRange", 0),
+        (void*)my_GetAttackRange,
+        (void**)&old_GetAttackRange
+    );
+
+    // [4] Attack Speed Hack
+    SafeHook(
+        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "GetBasicAtkCd", 0),
+        (void*)my_GetBasicAtkCd,
+        (void**)&old_GetBasicAtkCd
+    );
+
+    // [5] Drone View
+    SafeHook(
+        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "BaseCameraLogic", "GetMaxDistance", 0),
+        (void*)my_GetMaxDistance,
+        (void**)&old_GetMaxDistance
+    );
+
+    // [6] No Mana Cost
+    SafeHook(
+        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "GetSkillMp", 1),
+        (void*)my_GetSkillMp,
+        (void**)&old_GetSkillMp
+    );
+
+    // [7] Anti AFK
+    SafeHook(
+        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "EntityBase", "get_IsAFK", 0),
+        (void*)my_get_IsAFK,
+        (void**)&old_get_IsAFK
+    );
+
     pthread_exit(nullptr);
 }
 
+// ── ENTRY POINTS ─────────────────────────────────────────────
 __attribute__((constructor))
 void lib_main() {
-    pthread_t hacks;
-    pthread_create(&hacks, NULL, imgui_go,    NULL);
-    pthread_create(&hacks, NULL, hack_thread, NULL);
+    pthread_t t1, t2;
+    pthread_create(&t1, nullptr, imgui_go,    nullptr);
+    pthread_create(&t2, nullptr, hack_thread, nullptr);
 }
 
-extern "C" jint JNIEXPORT JNI_OnLoad(JavaVM *vm, void *key) {
-    JNIEnv *env;
+extern "C" jint JNIEXPORT JNI_OnLoad(JavaVM* vm, void* key) {
+    JNIEnv* env;
     vm->GetEnv((void**)&env, JNI_VERSION_1_6);
     return JNI_VERSION_1_6;
 }
