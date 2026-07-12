@@ -60,7 +60,6 @@ void SetupImgui() {
 
 ImGui::StyleColorsDark();
 ImGuiStyle *style = &ImGui::GetStyle();
-
 style->Alpha = 1.0f;
 style->WindowTitleAlign = ImVec2(0.5, 0.5);
     ImGui_ImplOpenGL3_Init("#version 100");
@@ -70,25 +69,10 @@ style->WindowTitleAlign = ImVec2(0.5, 0.5);
     ImGui::GetStyle().ScaleAllSizes(3.0f);
 }
 
-
 bool clearMousePos = true;
-struct UnityEngine_Vector2_Fields {
-    float x;
-    float y;
-};
-
-struct UnityEngine_Vector2_o {
-    UnityEngine_Vector2_Fields fields;
-};
-
-enum TouchPhase {
-    Began = 0,
-    Moved = 1,
-    Stationary = 2,
-    Ended = 3,
-    Canceled = 4
-};
-
+struct UnityEngine_Vector2_Fields { float x; float y; };
+struct UnityEngine_Vector2_o { UnityEngine_Vector2_Fields fields; };
+enum TouchPhase { Began=0, Moved=1, Stationary=2, Ended=3, Canceled=4 };
 struct UnityEngine_Touch_Fields {
     int32_t m_FingerId;
     struct UnityEngine_Vector2_o m_Position;
@@ -106,10 +90,8 @@ struct UnityEngine_Touch_Fields {
     float m_AzimuthAngle;
 };
 
-// ════════════════════════════════════════════════════════════
-// [MAP] EntityBase::get_m_CanSight
-// dump.cs: public virtual Boolean get_m_CanSight(); argsCount=0
-// ════════════════════════════════════════════════════════════
+// ── [1] Map Hack ─────────────────────────────────────────────
+// dump.cs: public virtual Boolean get_m_CanSight(); // argsCount=0
 bool Isget_m_CanSight = false;
 bool (*old_get_m_CanSight)(void* instance);
 bool get_m_CanSight(void* instance) {
@@ -121,10 +103,8 @@ bool get_m_CanSight(void* instance) {
     return old_get_m_CanSight(instance);
 }
 
-// ════════════════════════════════════════════════════════════
-// [MOVEMENT] LogicFighter::GetMoveSpeed
-// dump.cs: public Double GetMoveSpeed(Boolean bSummonOwner); argsCount=1
-// ════════════════════════════════════════════════════════════
+// ── [2] Speed Hack ───────────────────────────────────────────
+// dump.cs: public Double GetMoveSpeed(Boolean bSummonOwner); // argsCount=1
 bool IsSpeedHack = false;
 float SpeedMultiplier = 2.5f;
 double (*old_GetMoveSpeed)(void* thiz, bool bSummonOwner);
@@ -135,35 +115,7 @@ double my_GetMoveSpeed(void* thiz, bool bSummonOwner) {
     return old_GetMoveSpeed(thiz, bSummonOwner);
 }
 
-// ════════════════════════════════════════════════════════════
-// [BATTLE] LogicFighter::BeAtkModifyHP
-// dump.cs: public virtual Void BeAtkModifyHP(Int32 value, Battle.LogicFighter pAtk); argsCount=2
-// ════════════════════════════════════════════════════════════
-bool IsGodMode = false;
-void (*old_BeAtkModifyHP)(void* thiz, int value, void* pAtk);
-void my_BeAtkModifyHP(void* thiz, int value, void* pAtk) {
-    if (thiz != NULL && IsGodMode && value < 0) {
-        return; // blokir damage masuk
-    }
-    old_BeAtkModifyHP(thiz, value, pAtk);
-}
-
-// ════════════════════════════════════════════════════════════
-// [BATTLE] LogicFighter::CalcSkillCoolDown
-// dump.cs: public Int32 CalcSkillCoolDown(Int32 iCoolDownTime, Int32 iSpellId); argsCount=2
-// ════════════════════════════════════════════════════════════
-bool IsNoCD = false;
-int (*old_CalcSkillCoolDown)(void* thiz, int iCoolDownTime, int iSpellId);
-int my_CalcSkillCoolDown(void* thiz, int iCoolDownTime, int iSpellId) {
-    if (thiz != NULL && IsNoCD) {
-        return 0;
-    }
-    return old_CalcSkillCoolDown(thiz, iCoolDownTime, iSpellId);
-}
-
-// ════════════════════════════════════════════════════════════
-// DRAW MENU
-// ════════════════════════════════════════════════════════════
+// ── MENU ─────────────────────────────────────────────────────
 void DrawMenu() {
     const ImVec2 window_size = ImVec2(700, 600);
     ImGui::SetNextWindowSize(window_size, ImGuiCond_Once);
@@ -171,11 +123,6 @@ void DrawMenu() {
 
     if (ImGui::CollapsingHeader("Map", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Checkbox("Map Hack", &Isget_m_CanSight);
-    }
-
-    if (ImGui::CollapsingHeader("Battle", ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::Checkbox("God Mode",    &IsGodMode);
-        ImGui::Checkbox("No Cooldown", &IsNoCD);
     }
 
     if (ImGui::CollapsingHeader("Movement", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -188,9 +135,7 @@ void DrawMenu() {
     ImGui::End();
 }
 
-// ════════════════════════════════════════════════════════════
-// EGL SWAP BUFFERS — render loop ImGui
-// ════════════════════════════════════════════════════════════
+// ── EGL SWAP BUFFERS ─────────────────────────────────────────
 EGLBoolean (*old_eglSwapBuffers)(EGLDisplay dpy, EGLSurface surface);
 EGLBoolean hook_eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
 
@@ -223,14 +168,12 @@ EGLBoolean hook_eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
     return old_eglSwapBuffers(dpy, surface);
 }
 
-// ════════════════════════════════════════════════════════════
-// THREAD — EGL + Input hooks (tidak ada game hook di sini)
-// ════════════════════════════════════════════════════════════
+// ── THREADS ──────────────────────────────────────────────────
 void *imgui_go(void*) {
     void *handle_egl   = xdl_open("libEGL.so",   XDL_DEFAULT);
     void *handle_input = xdl_open("libinput.so",  XDL_DEFAULT);
 
-    void *xdl_sym_egl   = xdl_sym(handle_egl,   "eglSwapBuffers", nullptr);
+    void *xdl_sym_egl   = xdl_sym(handle_egl, "eglSwapBuffers", nullptr);
     void *xdl_sym_input = xdl_sym(handle_input,
         "_ZN7android13InputConsumer21initializeMotionEventEPNS_11MotionEventEPKNS_12InputMessageE",
         nullptr);
@@ -241,10 +184,6 @@ void *imgui_go(void*) {
     pthread_exit(nullptr);
 }
 
-// ════════════════════════════════════════════════════════════
-// THREAD — Game hooks: wajib setelah Il2CppAttach + sleep(5)
-// Semua Il2CppGetMethodOffset game dipanggil di sini SAJA
-// ════════════════════════════════════════════════════════════
 void *hack_thread(void*) {
     do {
         libBaseAddress = findLibrary(LIB);
@@ -252,32 +191,18 @@ void *hack_thread(void*) {
     Il2CppAttach("liblogic.so");
     sleep(5);
 
-    // [MAP] EntityBase::get_m_CanSight — argsCount=0 (property getter, no params)
+    // [1] Map Hack — EntityBase::get_m_CanSight, argsCount=0
     DobbyHook(
         (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "EntityBase", "get_m_CanSight", 0),
         (void*)get_m_CanSight,
         (void**)&old_get_m_CanSight
     );
 
-    // [MOVEMENT] LogicFighter::GetMoveSpeed — argsCount=1 (bool bSummonOwner)
+    // [2] Speed Hack — LogicFighter::GetMoveSpeed, argsCount=1
     DobbyHook(
         (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "GetMoveSpeed", 1),
         (void*)my_GetMoveSpeed,
         (void**)&old_GetMoveSpeed
-    );
-
-    // [BATTLE] LogicFighter::BeAtkModifyHP — argsCount=2 (int value, LogicFighter pAtk)
-    DobbyHook(
-        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "BeAtkModifyHP", 2),
-        (void*)my_BeAtkModifyHP,
-        (void**)&old_BeAtkModifyHP
-    );
-
-    // [BATTLE] LogicFighter::CalcSkillCoolDown — argsCount=2 (int iCoolDownTime, int iSpellId)
-    DobbyHook(
-        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "CalcSkillCoolDown", 2),
-        (void*)my_CalcSkillCoolDown,
-        (void**)&old_CalcSkillCoolDown
     );
 
     pthread_exit(nullptr);
