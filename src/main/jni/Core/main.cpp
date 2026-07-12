@@ -57,8 +57,8 @@ void SetupImgui() {
     get_width = (int (*)(void*)) Il2CppGetMethodOffset("UnityEngine.dll", "UnityEngine", "Screen", "get_width", 0);
     get_height = (int (*)(void*)) Il2CppGetMethodOffset("UnityEngine.dll", "UnityEngine", "Screen", "get_height", 0);
     io.DisplaySize = ImVec2((float)get_width(0), (float)get_height(0));
-    
-ImGui::StyleColorsDark(); // Set a theme
+
+ImGui::StyleColorsDark();
 ImGuiStyle *style = &ImGui::GetStyle();
 
 style->Alpha = 1.0f;
@@ -106,26 +106,91 @@ struct UnityEngine_Touch_Fields {
     float m_AzimuthAngle;
 };
 
-//EntityBase::get_m_CanSight
+// ════════════════════════════════════════════════════════════
+// [MAP] EntityBase::get_m_CanSight
+// dump.cs: public virtual Boolean get_m_CanSight(); argsCount=0
+// ════════════════════════════════════════════════════════════
 bool Isget_m_CanSight = false;
 bool (*old_get_m_CanSight)(void* instance);
 bool get_m_CanSight(void* instance) {
-if (instance != NULL) {
-if (Isget_m_CanSight) {
-return true; // true/false.
-}
-}
-return old_get_m_CanSight(instance);
+    if (instance != NULL) {
+        if (Isget_m_CanSight) {
+            return true;
+        }
+    }
+    return old_get_m_CanSight(instance);
 }
 
-void DrawMenu() {  
+// ════════════════════════════════════════════════════════════
+// [MOVEMENT] LogicFighter::GetMoveSpeed
+// dump.cs: public Double GetMoveSpeed(Boolean bSummonOwner); argsCount=1
+// ════════════════════════════════════════════════════════════
+bool IsSpeedHack = false;
+float SpeedMultiplier = 2.5f;
+double (*old_GetMoveSpeed)(void* thiz, bool bSummonOwner);
+double my_GetMoveSpeed(void* thiz, bool bSummonOwner) {
+    if (thiz != NULL && IsSpeedHack) {
+        return old_GetMoveSpeed(thiz, bSummonOwner) * (double)SpeedMultiplier;
+    }
+    return old_GetMoveSpeed(thiz, bSummonOwner);
+}
+
+// ════════════════════════════════════════════════════════════
+// [BATTLE] LogicFighter::BeAtkModifyHP
+// dump.cs: public virtual Void BeAtkModifyHP(Int32 value, Battle.LogicFighter pAtk); argsCount=2
+// ════════════════════════════════════════════════════════════
+bool IsGodMode = false;
+void (*old_BeAtkModifyHP)(void* thiz, int value, void* pAtk);
+void my_BeAtkModifyHP(void* thiz, int value, void* pAtk) {
+    if (thiz != NULL && IsGodMode && value < 0) {
+        return; // blokir damage masuk
+    }
+    old_BeAtkModifyHP(thiz, value, pAtk);
+}
+
+// ════════════════════════════════════════════════════════════
+// [BATTLE] LogicFighter::CalcSkillCoolDown
+// dump.cs: public Int32 CalcSkillCoolDown(Int32 iCoolDownTime, Int32 iSpellId); argsCount=2
+// ════════════════════════════════════════════════════════════
+bool IsNoCD = false;
+int (*old_CalcSkillCoolDown)(void* thiz, int iCoolDownTime, int iSpellId);
+int my_CalcSkillCoolDown(void* thiz, int iCoolDownTime, int iSpellId) {
+    if (thiz != NULL && IsNoCD) {
+        return 0;
+    }
+    return old_CalcSkillCoolDown(thiz, iCoolDownTime, iSpellId);
+}
+
+// ════════════════════════════════════════════════════════════
+// DRAW MENU
+// ════════════════════════════════════════════════════════════
+void DrawMenu() {
     const ImVec2 window_size = ImVec2(700, 600);
     ImGui::SetNextWindowSize(window_size, ImGuiCond_Once);
     ImGui::Begin("IMGUI MODMENU", nullptr);
+
+    if (ImGui::CollapsingHeader("Map", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Checkbox("Map Hack", &Isget_m_CanSight);
-    ImGui::End();  
+    }
+
+    if (ImGui::CollapsingHeader("Battle", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Checkbox("God Mode",    &IsGodMode);
+        ImGui::Checkbox("No Cooldown", &IsNoCD);
+    }
+
+    if (ImGui::CollapsingHeader("Movement", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Checkbox("Speed Hack", &IsSpeedHack);
+        if (IsSpeedHack) {
+            ImGui::SliderFloat("Speed x", &SpeedMultiplier, 1.0f, 5.0f);
+        }
+    }
+
+    ImGui::End();
 }
 
+// ════════════════════════════════════════════════════════════
+// EGL SWAP BUFFERS — render loop ImGui
+// ════════════════════════════════════════════════════════════
 EGLBoolean (*old_eglSwapBuffers)(EGLDisplay dpy, EGLSurface surface);
 EGLBoolean hook_eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
 
@@ -133,7 +198,7 @@ EGLBoolean hook_eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
     static bool should_clear_mouse_pos = false;
 
     if (!is_setup) {
-SetupImgui();
+        SetupImgui();
         is_setup = true;
     }
 
@@ -147,8 +212,8 @@ SetupImgui();
     }
     ImGui_ImplOpenGL3_NewFrame();
     ImGui::NewFrame();
-DrawMenu();
-ImGui::Render();
+    DrawMenu();
+    ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     ImGui::EndFrame();
     if (should_clear_mouse_pos) {
@@ -158,35 +223,70 @@ ImGui::Render();
     return old_eglSwapBuffers(dpy, surface);
 }
 
-
+// ════════════════════════════════════════════════════════════
+// THREAD — EGL + Input hooks (tidak ada game hook di sini)
+// ════════════════════════════════════════════════════════════
 void *imgui_go(void*) {
-    void *handle_egl = xdl_open("libEGL.so", XDL_DEFAULT);
-    void *handle_input = xdl_open("libinput.so", XDL_DEFAULT);
-    
-    void *xdl_sym_egl = xdl_sym(handle_egl, "eglSwapBuffers", nullptr);
-    void *xdl_sym_input = xdl_sym(handle_input, "_ZN7android13InputConsumer21initializeMotionEventEPNS_11MotionEventEPKNS_12InputMessageE", nullptr);
-    
-    DobbyHook(xdl_sym_egl, (void*)hook_eglSwapBuffers, (void**)&old_eglSwapBuffers);
-    DobbyHook(xdl_sym_input, (void*)myInput, (void**)&origInput);
-    
+    void *handle_egl   = xdl_open("libEGL.so",   XDL_DEFAULT);
+    void *handle_input = xdl_open("libinput.so",  XDL_DEFAULT);
+
+    void *xdl_sym_egl   = xdl_sym(handle_egl,   "eglSwapBuffers", nullptr);
+    void *xdl_sym_input = xdl_sym(handle_input,
+        "_ZN7android13InputConsumer21initializeMotionEventEPNS_11MotionEventEPKNS_12InputMessageE",
+        nullptr);
+
+    DobbyHook(xdl_sym_egl,   (void*)hook_eglSwapBuffers, (void**)&old_eglSwapBuffers);
+    DobbyHook(xdl_sym_input, (void*)myInput,              (void**)&origInput);
+
     pthread_exit(nullptr);
 }
 
+// ════════════════════════════════════════════════════════════
+// THREAD — Game hooks: wajib setelah Il2CppAttach + sleep(5)
+// Semua Il2CppGetMethodOffset game dipanggil di sini SAJA
+// ════════════════════════════════════════════════════════════
 void *hack_thread(void*) {
     do {
-libBaseAddress = findLibrary(LIB);
-} while (libBaseAddress == 0);
-Il2CppAttach("liblogic.so");
-sleep(5);
-    DobbyHook((void *)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "EntityBase", "get_m_CanSight", 0), (void *)get_m_CanSight, (void **)&old_get_m_CanSight);
-    
+        libBaseAddress = findLibrary(LIB);
+    } while (libBaseAddress == 0);
+    Il2CppAttach("liblogic.so");
+    sleep(5);
+
+    // [MAP] EntityBase::get_m_CanSight — argsCount=0 (property getter, no params)
+    DobbyHook(
+        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "EntityBase", "get_m_CanSight", 0),
+        (void*)get_m_CanSight,
+        (void**)&old_get_m_CanSight
+    );
+
+    // [MOVEMENT] LogicFighter::GetMoveSpeed — argsCount=1 (bool bSummonOwner)
+    DobbyHook(
+        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "GetMoveSpeed", 1),
+        (void*)my_GetMoveSpeed,
+        (void**)&old_GetMoveSpeed
+    );
+
+    // [BATTLE] LogicFighter::BeAtkModifyHP — argsCount=2 (int value, LogicFighter pAtk)
+    DobbyHook(
+        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "BeAtkModifyHP", 2),
+        (void*)my_BeAtkModifyHP,
+        (void**)&old_BeAtkModifyHP
+    );
+
+    // [BATTLE] LogicFighter::CalcSkillCoolDown — argsCount=2 (int iCoolDownTime, int iSpellId)
+    DobbyHook(
+        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "CalcSkillCoolDown", 2),
+        (void*)my_CalcSkillCoolDown,
+        (void**)&old_CalcSkillCoolDown
+    );
+
     pthread_exit(nullptr);
 }
 
 __attribute__((constructor))
 void lib_main() {
     pthread_t hacks;
-    pthread_create(&hacks, NULL, imgui_go, NULL);
+    pthread_create(&hacks, NULL, imgui_go,    NULL);
     pthread_create(&hacks, NULL, hack_thread, NULL);
 }
 
