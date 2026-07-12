@@ -46,23 +46,24 @@ std::string GetProp(const char* key) {
     return std::string(value);
 }
 
-// FIX #1: Simpan pointer sekali saja, bukan resolve tiap frame
+// TouchCount pointer: di-resolve lazy setelah IL2CPP siap
 static int (*TouchCount)(void*) = nullptr;
 
-void SetupImgui() {
+// FIX UTAMA: SetupImgui pakai eglQuerySurface, TIDAK pakai Il2CppGetMethodOffset
+// Alasan: eglSwapBuffers bisa fire sangat awal (0% loading), sebelum Il2CppAttach dipanggil.
+// Memanggil Il2CppGetMethodOffset sebelum Il2CppAttach → SIGSEGV / force close.
+void SetupImgui(EGLDisplay dpy, EGLSurface surface) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
 
-    int(*get_width)(void*);
-    int(*get_height)(void*);
-    get_width  = (int (*)(void*)) Il2CppGetMethodOffset("UnityEngine.dll", "UnityEngine", "Screen", "get_width",  0);
-    get_height = (int (*)(void*)) Il2CppGetMethodOffset("UnityEngine.dll", "UnityEngine", "Screen", "get_height", 0);
-
-    // FIX #2: Null check sebelum panggil get_width/get_height
-    float w = (get_width  && get_width(0)  > 0) ? (float)get_width(0)  : 1280.0f;
-    float h = (get_height && get_height(0) > 0) ? (float)get_height(0) : 720.0f;
-    io.DisplaySize = ImVec2(w, h);
+    // Ambil ukuran layar dari EGL langsung — selalu aman, tidak butuh IL2CPP
+    EGLint w = 1280, h = 720;
+    eglQuerySurface(dpy, surface, EGL_WIDTH,  &w);
+    eglQuerySurface(dpy, surface, EGL_HEIGHT, &h);
+    if (w <= 0) w = 1280;
+    if (h <= 0) h = 720;
+    io.DisplaySize = ImVec2((float)w, (float)h);
 
     ImGui::StyleColorsDark();
     ImGuiStyle *style = &ImGui::GetStyle();
@@ -74,12 +75,7 @@ void SetupImgui() {
     io.Fonts->AddFontFromMemoryTTF(&Roboto_Regular, sizeof(Roboto_Regular), 32.0f, &font_cfg,
                                     io.Fonts->GetGlyphRangesCyrillic());
     ImGui::GetStyle().ScaleAllSizes(3.0f);
-
-    // FIX #1: Resolve TouchCount sekali di sini saja
-    TouchCount = (int (*)(void*)) Il2CppGetMethodOffset("UnityEngine.dll", "UnityEngine", "Input", "get_touchCount", 0);
 }
-
-bool clearMousePos = true;
 
 struct UnityEngine_Vector2_Fields { float x; float y; };
 struct UnityEngine_Vector2_o { UnityEngine_Vector2_Fields fields; };
@@ -182,28 +178,34 @@ EGLBoolean hook_eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
     static bool should_clear_mouse_pos = false;
 
     if (!is_setup) {
-        SetupImgui();
+        // Pass dpy + surface agar SetupImgui bisa pakai eglQuerySurface
+        SetupImgui(dpy, surface);
         is_setup = true;
     }
 
     ImGuiIO &io = ImGui::GetIO();
 
-    // FIX #1: Gunakan pointer yang sudah di-resolve sekali di SetupImgui()
-    // FIX #2: Null check sebelum panggil TouchCount
+    // FIX: Lazy-resolve TouchCount, hanya setelah IL2CPP assemblies siap
+    // Il2CppIsAssembliesLoaded() aman dipanggil kapan saja
+    if (TouchCount == nullptr && Il2CppIsAssembliesLoaded()) {
+        TouchCount = (int (*)(void*)) Il2CppGetMethodOffset(
+            "UnityEngine.dll", "UnityEngine", "Input", "get_touchCount", 0);
+    }
+
+    // Null check wajib sebelum panggil
     if (TouchCount != nullptr) {
-        int touchCount = TouchCount(nullptr);
-        should_clear_mouse_pos = (touchCount <= 0);
+        int tc = TouchCount(nullptr);
+        should_clear_mouse_pos = (tc <= 0);
     }
 
     ImGui_ImplOpenGL3_NewFrame();
     ImGui::NewFrame();
     DrawMenu();
 
-    // FIX #3: Render() sudah memanggil EndFrame() secara internal
-    // JANGAN panggil EndFrame() lagi setelah Render() — ini menyebabkan double-call crash
+    // FIX: Render() sudah memanggil EndFrame() secara internal.
+    // JANGAN panggil EndFrame() lagi — double-call corrupt state ImGui.
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-    // REMOVED: ImGui::EndFrame(); <-- ini yang menyebabkan loading stuck
 
     if (should_clear_mouse_pos) {
         io.MousePos = ImVec2(-1, -1);
@@ -217,51 +219,58 @@ EGLBoolean hook_eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
 // THREADS
 // ─────────────────────────────────────────────
 void *imgui_go(void*) {
-    void *handle_egl   = xdl_open("libEGL.so",   XDL_DEFAULT);
-    void *handle_input = xdl_open("libinput.so",  XDL_DEFAULT);
+    void *handle_egl   = xdl_open("libEGL.so",  XDL_DEFAULT);
+    void *handle_input = xdl_open("libinput.so", XDL_DEFAULT);
 
-    void *xdl_sym_egl   = xdl_sym(handle_egl,   "eglSwapBuffers", nullptr);
-    void *xdl_sym_input = xdl_sym(handle_input,
-        "_ZN7android13InputConsumer21initializeMotionEventEPNS_11MotionEventEPKNS_12InputMessageE",
-        nullptr);
+    void *xdl_sym_egl = handle_egl
+        ? xdl_sym(handle_egl, "eglSwapBuffers", nullptr)
+        : nullptr;
 
-    DobbyHook(xdl_sym_egl,   (void*)hook_eglSwapBuffers, (void**)&old_eglSwapBuffers);
-    DobbyHook(xdl_sym_input,  (void*)myInput,             (void**)&origInput);
+    void *xdl_sym_input = handle_input
+        ? xdl_sym(handle_input,
+            "_ZN7android13InputConsumer21initializeMotionEventEPNS_11MotionEventEPKNS_12InputMessageE",
+            nullptr)
+        : nullptr;
+
+    // FIX: Null check wajib sebelum DobbyHook
+    // DobbyHook(nullptr, ...) → CRASH LANGSUNG
+    if (xdl_sym_egl)   DobbyHook(xdl_sym_egl,   (void*)hook_eglSwapBuffers, (void**)&old_eglSwapBuffers);
+    if (xdl_sym_input) DobbyHook(xdl_sym_input,  (void*)myInput,             (void**)&origInput);
 
     pthread_exit(nullptr);
 }
 
 void *hack_thread(void*) {
+    // Tunggu sampai liblogic.so ter-load
     do {
         libBaseAddress = findLibrary(LIB);
+        if (libBaseAddress == 0) usleep(100000); // 100ms per cek, tidak busy-loop
     } while (libBaseAddress == 0);
+
     Il2CppAttach("liblogic.so");
-    sleep(5);
+    sleep(5); // Tunggu IL2CPP metadata siap
 
-    // [1] Map Hack
+    // Null check di semua DobbyHook — jika offset tidak ketemu, skip (tidak crash)
     void* addr1 = (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "EntityBase",   "get_m_CanSight",    0);
-    if (addr1) DobbyHook(addr1, (void*)get_m_CanSight,       (void**)&old_get_m_CanSight);
+    if (addr1) DobbyHook(addr1, (void*)get_m_CanSight,      (void**)&old_get_m_CanSight);
 
-    // [2] Speed Hack
     void* addr2 = (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "GetMoveSpeed",      1);
-    if (addr2) DobbyHook(addr2, (void*)myGetMoveSpeed,       (void**)&oldGetMoveSpeed);
+    if (addr2) DobbyHook(addr2, (void*)myGetMoveSpeed,      (void**)&oldGetMoveSpeed);
 
-    // [3] God Mode
     void* addr3 = (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "BeAtkModifyHP",     2);
-    if (addr3) DobbyHook(addr3, (void*)myBeAtkModifyHP,      (void**)&oldBeAtkModifyHP);
+    if (addr3) DobbyHook(addr3, (void*)myBeAtkModifyHP,     (void**)&oldBeAtkModifyHP);
 
-    // [4] No Cooldown
     void* addr4 = (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "CalcSkillCoolDown", 2);
-    if (addr4) DobbyHook(addr4, (void*)myCalcSkillCoolDown,  (void**)&oldCalcSkillCoolDown);
+    if (addr4) DobbyHook(addr4, (void*)myCalcSkillCoolDown, (void**)&oldCalcSkillCoolDown);
 
     pthread_exit(nullptr);
 }
 
 __attribute__((constructor))
 void lib_main() {
-    pthread_t hacks;
-    pthread_create(&hacks, NULL, imgui_go,    NULL);
-    pthread_create(&hacks, NULL, hack_thread, NULL);
+    pthread_t t1, t2;
+    pthread_create(&t1, NULL, imgui_go,    NULL);
+    pthread_create(&t2, NULL, hack_thread, NULL);
 }
 
 extern "C" jint JNIEXPORT JNI_OnLoad(JavaVM *vm, void *key) {
