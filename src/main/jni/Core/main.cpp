@@ -59,41 +59,18 @@ static void SafeHook(void* addr, void* replace, void** origin) {
 // ═════════════════════════════════════════════════════════════
 // FITUR — dikonfirmasi dari dump.cs v2.1.88.12027
 // Class: Battle.LogicFighter | Assembly: Assembly-CSharp.dll
+// ISOLASI TEST: hanya [1] Map Hack + [4] Attack Speed + [5] No Cooldown
+// Fitur lain di-disable sementara untuk cari penyebab FC
 // ═════════════════════════════════════════════════════════════
 
 // ── [1] Map Hack ─────────────────────────────────────────────
 // dump.cs line 550212: public virtual Boolean get_m_CanSight()
-// argsCount=0 — return true = musuh selalu kelihatan di minimap
+// argsCount=0
 bool IsMapHack = false;
 bool (*old_get_m_CanSight)(void* thiz);
 bool my_get_m_CanSight(void* thiz) {
     if (thiz && IsMapHack) return true;
     return old_get_m_CanSight(thiz);
-}
-
-// ── [2] Speed Hack ────────────────────────────────────────────
-// dump.cs line 550303: public Double CalcRealSpeed(Int32 value)
-// argsCount=1 — fungsi ini convert nilai speed int → double (actual speed)
-// GetMoveSpeed tidak efek karena di-cap; CalcRealSpeed adalah titik apply-nya
-bool IsSpeedHack = false;
-float SpeedMultiplier = 2.0f;
-double (*old_CalcRealSpeed)(void* thiz, int32_t value);
-double my_CalcRealSpeed(void* thiz, int32_t value) {
-    double base = old_CalcRealSpeed(thiz, value);
-    if (thiz && IsSpeedHack) return base * (double)SpeedMultiplier;
-    return base;
-}
-
-// ── [3] Attack Range Hack ─────────────────────────────────────
-// dump.cs line 556311: public virtual Double GetAttackRange()
-// argsCount=0 — multiply jangkauan serangan
-bool IsAttackRange = false;
-float RangeMultiplier = 3.0f;
-double (*old_GetAttackRange)(void* thiz);
-double my_GetAttackRange(void* thiz) {
-    double base = old_GetAttackRange(thiz);
-    if (thiz && IsAttackRange) return base * (double)RangeMultiplier;
-    return base;
 }
 
 // ── [4] Attack Speed Hack ─────────────────────────────────────
@@ -118,68 +95,29 @@ double my_GetCoolPer(void* thiz) {
     return old_GetCoolPer(thiz);
 }
 
-// ── [6] No Mana Cost ──────────────────────────────────────────
-// dump.cs line 550313: public Double GetMpCostPer()
-// argsCount=0 — return 0.0 = skill tidak pakai mana
-bool IsNoMana = false;
-double (*old_GetMpCostPer)(void* thiz);
-double my_GetMpCostPer(void* thiz) {
-    if (thiz && IsNoMana) return 0.0;
-    return old_GetMpCostPer(thiz);
-}
-
-// ── [7] Can't Be Attacked ─────────────────────────────────────
-// dump.cs line 550220: public Boolean get_m_bDontBeAtk()
-// argsCount=0 — return true = karakter tidak bisa diserang
-bool IsDontBeAtk = false;
-bool (*old_get_m_bDontBeAtk)(void* thiz);
-bool my_get_m_bDontBeAtk(void* thiz) {
-    if (thiz && IsDontBeAtk) return true;
-    return old_get_m_bDontBeAtk(thiz);
-}
-
 // ═════════════════════════════════════════════════════════════
 // MENU
 // ═════════════════════════════════════════════════════════════
 void DrawMenu() {
-    ImGui::SetNextWindowSize(ImVec2(780, 860), ImGuiCond_Once);
-    ImGui::Begin("MLBB MOD MENU v2.1.88", nullptr, ImGuiWindowFlags_NoCollapse);
+    ImGui::SetNextWindowSize(ImVec2(780, 500), ImGuiCond_Once);
+    ImGui::Begin("MLBB MOD MENU — ISOLASI TEST", nullptr, ImGuiWindowFlags_NoCollapse);
 
     // MAP
     if (ImGui::CollapsingHeader("  MAP", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Checkbox("Map Hack", &IsMapHack);
     }
 
-    // MOVEMENT
-    if (ImGui::CollapsingHeader("  MOVEMENT", ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::Checkbox("Speed Hack", &IsSpeedHack);
-        if (IsSpeedHack) {
-            ImGui::SliderFloat("Speed x", &SpeedMultiplier, 1.0f, 5.0f);
-        }
-    }
-
-    // COMBAT
-    if (ImGui::CollapsingHeader("  COMBAT", ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::Checkbox("Attack Range Hack", &IsAttackRange);
-        if (IsAttackRange) {
-            ImGui::SliderFloat("Range x", &RangeMultiplier, 1.0f, 8.0f);
-        }
-        ImGui::Separator();
+    // COMBAT — hanya 2 fitur yang sedang ditest
+    if (ImGui::CollapsingHeader("  COMBAT [TEST]", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Checkbox("Attack Speed Hack", &IsAtkSpeed);
         if (IsAtkSpeed) {
             ImGui::SliderFloat("Atk Speed x", &AtkSpeedMult, 1.0f, 5.0f);
         }
         ImGui::Separator();
         ImGui::Checkbox("No Cooldown", &IsNoCooldown);
-        ImGui::Separator();
-        ImGui::Checkbox("No Mana Cost", &IsNoMana);
     }
 
-    // DEFENSE
-    if (ImGui::CollapsingHeader("  DEFENSE", ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::Checkbox("Can't Be Attacked", &IsDontBeAtk);
-    }
-
+    ImGui::TextDisabled("-- Fitur lain dinonaktifkan sementara --");
     ImGui::End();
 }
 
@@ -275,30 +213,17 @@ void* imgui_go(void*) {
 // ═════════════════════════════════════════════════════════════
 // HACK THREAD
 // sleep(10) — tunggu game selesai loading sebelum hook dipasang
-// Ini mencegah FC yang terjadi saat hook dipasang di tengah inisialisasi
+// ISOLASI: hanya 3 hook aktif ([1] Map Hack, [4] Atk Speed, [5] No Cooldown)
 // ═════════════════════════════════════════════════════════════
 void* hack_thread(void*) {
     do { libBaseAddress = findLibrary(LIB); } while (!libBaseAddress);
     Il2CppAttach("liblogic.so");
-    sleep(10);  // naik dari 5 → 10 agar dipasang SETELAH loading selesai
+    sleep(10);
 
     // [1] Map Hack — get_m_CanSight, argsCount=0
     SafeHook(
         (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "get_m_CanSight", 0),
         (void*)my_get_m_CanSight, (void**)&old_get_m_CanSight
-    );
-
-    // [2] Speed Hack — CalcRealSpeed(Int32), argsCount=1
-    // Ganti GetMoveSpeed (tidak efek) → CalcRealSpeed (titik apply actual speed)
-    SafeHook(
-        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "CalcRealSpeed", 1),
-        (void*)my_CalcRealSpeed, (void**)&old_CalcRealSpeed
-    );
-
-    // [3] Attack Range — GetAttackRange, argsCount=0
-    SafeHook(
-        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "GetAttackRange", 0),
-        (void*)my_GetAttackRange, (void**)&old_GetAttackRange
     );
 
     // [4] Attack Speed — get_m_AtkSpeed, argsCount=0
@@ -313,17 +238,11 @@ void* hack_thread(void*) {
         (void*)my_GetCoolPer, (void**)&old_GetCoolPer
     );
 
-    // [6] No Mana Cost — GetMpCostPer, argsCount=0
-    SafeHook(
-        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "GetMpCostPer", 0),
-        (void*)my_GetMpCostPer, (void**)&old_GetMpCostPer
-    );
-
-    // [7] Can't Be Attacked — get_m_bDontBeAtk, argsCount=0
-    SafeHook(
-        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "get_m_bDontBeAtk", 0),
-        (void*)my_get_m_bDontBeAtk, (void**)&old_get_m_bDontBeAtk
-    );
+    // DISABLED SEMENTARA — cari penyebab FC:
+    // [2] Speed Hack (CalcRealSpeed)
+    // [3] Attack Range (GetAttackRange)
+    // [6] No Mana Cost (GetMpCostPer)
+    // [7] Can't Be Attacked (get_m_bDontBeAtk)
 
     pthread_exit(nullptr);
 }
