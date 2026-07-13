@@ -57,25 +57,11 @@ static void SafeHook(void* addr, void* replace, void** origin) {
 }
 
 // ═════════════════════════════════════════════════════════════
-// FITUR — dikonfirmasi dari dump.cs v2.1.88.12027
-// Class: Battle.LogicFighter | Assembly: Assembly-CSharp.dll
-// ISOLASI TEST: hanya [1] Map Hack + [4] Attack Speed + [5] No Cooldown
-// Fitur lain di-disable sementara untuk cari penyebab FC
+// FITUR — ISOLASI TOTAL: hanya Attack Speed
+// dump.cs line 550262: public virtual Double get_m_AtkSpeed()
+// Battle.LogicFighter, Assembly-CSharp.dll, argsCount=0
 // ═════════════════════════════════════════════════════════════
 
-// ── [1] Map Hack ─────────────────────────────────────────────
-// dump.cs line 550212: public virtual Boolean get_m_CanSight()
-// argsCount=0
-bool IsMapHack = false;
-bool (*old_get_m_CanSight)(void* thiz);
-bool my_get_m_CanSight(void* thiz) {
-    if (thiz && IsMapHack) return true;
-    return old_get_m_CanSight(thiz);
-}
-
-// ── [4] Attack Speed Hack ─────────────────────────────────────
-// dump.cs line 550262: public virtual Double get_m_AtkSpeed()
-// argsCount=0 — multiply attack speed
 bool IsAtkSpeed = false;
 float AtkSpeedMult = 3.0f;
 double (*old_get_m_AtkSpeed)(void* thiz);
@@ -85,39 +71,21 @@ double my_get_m_AtkSpeed(void* thiz) {
     return base;
 }
 
-// ── [5] No Cooldown ───────────────────────────────────────────
-// dump.cs line 550316: public Double GetCoolPer()
-// argsCount=0 — return 0.0 = 100% cooldown reduction
-bool IsNoCooldown = false;
-double (*old_GetCoolPer)(void* thiz);
-double my_GetCoolPer(void* thiz) {
-    if (thiz && IsNoCooldown) return 0.0;
-    return old_GetCoolPer(thiz);
-}
-
 // ═════════════════════════════════════════════════════════════
 // MENU
 // ═════════════════════════════════════════════════════════════
 void DrawMenu() {
-    ImGui::SetNextWindowSize(ImVec2(780, 500), ImGuiCond_Once);
-    ImGui::Begin("MLBB MOD MENU — ISOLASI TEST", nullptr, ImGuiWindowFlags_NoCollapse);
+    ImGui::SetNextWindowSize(ImVec2(780, 300), ImGuiCond_Once);
+    ImGui::Begin("MLBB MOD — ATK SPEED TEST", nullptr, ImGuiWindowFlags_NoCollapse);
 
-    // MAP
-    if (ImGui::CollapsingHeader("  MAP", ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::Checkbox("Map Hack", &IsMapHack);
-    }
-
-    // COMBAT — hanya 2 fitur yang sedang ditest
-    if (ImGui::CollapsingHeader("  COMBAT [TEST]", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::CollapsingHeader("  COMBAT", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Checkbox("Attack Speed Hack", &IsAtkSpeed);
         if (IsAtkSpeed) {
             ImGui::SliderFloat("Atk Speed x", &AtkSpeedMult, 1.0f, 5.0f);
         }
-        ImGui::Separator();
-        ImGui::Checkbox("No Cooldown", &IsNoCooldown);
     }
 
-    ImGui::TextDisabled("-- Fitur lain dinonaktifkan sementara --");
+    ImGui::TextDisabled("Hanya 1 hook aktif: get_m_AtkSpeed");
     ImGui::End();
 }
 
@@ -211,38 +179,28 @@ void* imgui_go(void*) {
 }
 
 // ═════════════════════════════════════════════════════════════
-// HACK THREAD
-// sleep(10) — tunggu game selesai loading sebelum hook dipasang
-// ISOLASI: hanya 3 hook aktif ([1] Map Hack, [4] Atk Speed, [5] No Cooldown)
+// HACK THREAD — ISOLASI TOTAL: 1 hook saja
+// sleep(10) tetap ada
 // ═════════════════════════════════════════════════════════════
 void* hack_thread(void*) {
     do { libBaseAddress = findLibrary(LIB); } while (!libBaseAddress);
     Il2CppAttach("liblogic.so");
     sleep(10);
 
-    // [1] Map Hack — get_m_CanSight, argsCount=0
-    SafeHook(
-        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "get_m_CanSight", 0),
-        (void*)my_get_m_CanSight, (void**)&old_get_m_CanSight
-    );
-
+    // HANYA INI YANG AKTIF:
     // [4] Attack Speed — get_m_AtkSpeed, argsCount=0
     SafeHook(
         (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "get_m_AtkSpeed", 0),
         (void*)my_get_m_AtkSpeed, (void**)&old_get_m_AtkSpeed
     );
 
-    // [5] No Cooldown — GetCoolPer, argsCount=0
-    SafeHook(
-        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "GetCoolPer", 0),
-        (void*)my_GetCoolPer, (void**)&old_GetCoolPer
-    );
-
-    // DISABLED SEMENTARA — cari penyebab FC:
-    // [2] Speed Hack (CalcRealSpeed)
-    // [3] Attack Range (GetAttackRange)
-    // [6] No Mana Cost (GetMpCostPer)
-    // [7] Can't Be Attacked (get_m_bDontBeAtk)
+    // SEMUA DISABLED:
+    // [1] Map Hack      (get_m_CanSight)
+    // [2] Speed Hack    (CalcRealSpeed)
+    // [3] Attack Range  (GetAttackRange)
+    // [5] No Cooldown   (GetCoolPer)
+    // [6] No Mana Cost  (GetMpCostPer)
+    // [7] Cant Be Atk   (get_m_bDontBeAtk)
 
     pthread_exit(nullptr);
 }
