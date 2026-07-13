@@ -56,12 +56,6 @@ static void SafeHook(void* addr, void* replace, void** origin) {
     DobbyHook(addr, replace, origin);
 }
 
-// ── Local Player Detection ────────────────────────────────────
-// dump.cs: public virtual Boolean get_bIsMainEntity() // 0xffffffff8b04a384
-// Digunakan untuk filter hook agar hanya berlaku pada hero lokal
-// Tidak di-hook — hanya dipanggil sebagai function pointer
-static bool (*fn_IsMainEntity)(void* thiz, void* method_info) = nullptr;
-
 // ═════════════════════════════════════════════════════════════
 // FITUR
 // Class: Battle.LogicFighter | Assembly-CSharp.dll
@@ -71,9 +65,8 @@ static bool (*fn_IsMainEntity)(void* thiz, void* method_info) = nullptr;
 
 // ── [1] Map Hack ──────────────────────────────────────────────
 // dump.cs line 550212
-// public virtual Boolean get_m_CanSight()    offset: 0xffffffff8bc9d0ec
+// public virtual Boolean get_m_CanSight()
 // argsCount=0 | return bool | virtual — dipanggil renderer minimap
-// Berlaku untuk SEMUA entity (intentional: tampilkan semua musuh di minimap)
 bool IsMapHack = false;
 bool (*old_get_m_CanSight)(void* thiz, void* method_info);
 bool my_get_m_CanSight(void* thiz, void* method_info) {
@@ -82,64 +75,43 @@ bool my_get_m_CanSight(void* thiz, void* method_info) {
 }
 
 // ── [2] Invisible ─────────────────────────────────────────────
-// FIX: Hook InSkillHide() BUKAN get_m_bSkillHide()
+// FIX v3: FAIL-OPEN — tidak ada filter local player
 //
-// MENGAPA get_m_bSkillHide() TIDAK BEKERJA:
-//   get_m_bSkillHide() = raw field getter (hanya return m_bSkillHide field)
-//   Il2cpp compiled code membaca field m_bSkillHide LANGSUNG dari memory offset,
-//   bukan melalui property getter — sehingga hook pada getter diabaikan.
+// BUG SEBELUMNYA (v2): fn_IsMainEntity filter FAIL-CLOSED
+//   Kondisi: if (fn_IsMainEntity && fn_IsMainEntity(thiz))
+//   Masalah: Il2CppGetMethodOffset("Battle","LogicEntityBase","get_bIsMainEntity",0)
+//            return NULL karena method tidak ada di LogicFighter area dump.cs
+//   Efek: fn_IsMainEntity == null → kondisi SELALU false → hook tidak pernah return true
 //
-// MENGAPA InSkillHide() BEKERJA:
-//   InSkillHide() adalah method yang dipanggil oleh engine, AI musuh,
-//   dan targeting system untuk cek apakah fighter dalam kondisi stealth.
-//   Ini adalah entry point yang SELALU dipanggil sebelum musuh bisa target hero.
+// SOLUSI: Hapus filter, apply ke SEMUA entity (acceptable — sama dengan Map Hack)
+//   Sisi efek: semua hero/monster ikut stealth mode dari perspektif engine lokal
+//   Trade-off: bisa menyebabkan musuh juga tidak bisa saling target
 //
 // dump.cs line ~550211
 // public Boolean InSkillHide()    offset: 0xffffffff8bc9d0c4
 // argsCount=0 | return bool
-//
-// FILTER LOCAL PLAYER: fn_IsMainEntity(thiz) — hanya berlaku hero sendiri
-// (mencegah semua entity ikut stealth → game logic conflict)
 bool IsInvisible = false;
 bool (*old_InSkillHide)(void* thiz, void* method_info);
 bool my_InSkillHide(void* thiz, void* method_info) {
-    if (thiz && IsInvisible) {
-        // Filter: hanya local player (get_bIsMainEntity == true)
-        if (fn_IsMainEntity && fn_IsMainEntity(thiz, method_info)) {
-            return true;
-        }
-    }
+    if (thiz && IsInvisible) return true;
     return old_InSkillHide(thiz, method_info);
 }
 
-// ── [3] Cant Be Attacked ─────────────────────────────────────
-// MENGGANTIKAN Fake Death yang tidak bisa diimplementasi client-side.
+// ── [3] Cant Be Attacked ──────────────────────────────────────
+// FIX v3: FAIL-OPEN — tidak ada filter local player
 //
-// MENGAPA Fake Death TIDAK BEKERJA:
-//   m_bFakeDeath adalah flag yang DI-SET OLEH SERVER setiap game tick.
-//   Hook get_m_bFakeDeath() memang return true, tapi server terus push false
-//   via netcode (ISHOW_UpdateShowEye) dan override nilai setiap sync tick.
-//   Fake Death murni server-controlled di MLBB multiplayer — tidak bisa
-//   di-override hanya dari client-side getter hook.
+// BUG SEBELUMNYA (v2): sama dengan [2], fn_IsMainEntity NULL → tidak pernah aktif
 //
-// SOLUSI — get_m_bDontBeAtk():
-//   Flag ini dicek oleh targeting system (AI musuh + skill targeted) sebelum
-//   memilih target. Jika true, hero TIDAK BISA dijadikan target serangan.
-//   Lebih efektif karena targeting check adalah client-side logic.
+// MENGGANTIKAN Fake Death:
+//   m_bFakeDeath = server-controlled flag, di-override tiap tick → tidak bisa dimod
+//   get_m_bDontBeAtk() = dicek targeting system (AI + skill targeted) sebelum attack
 //
-// dump.cs line 550220 (dari area 550216)
-// public Boolean get_m_bDontBeAtk()    offset: 0xffffffff8bc9debc
-// argsCount=0 | return bool
-//
-// FILTER LOCAL PLAYER: fn_IsMainEntity(thiz)
+// dump.cs: public Boolean get_m_bDontBeAtk()
+// offset: 0xffffffff8bc9debc | argsCount=0 | return bool
 bool IsCantBeAtk = false;
 bool (*old_get_m_bDontBeAtk)(void* thiz, void* method_info);
 bool my_get_m_bDontBeAtk(void* thiz, void* method_info) {
-    if (thiz && IsCantBeAtk) {
-        if (fn_IsMainEntity && fn_IsMainEntity(thiz, method_info)) {
-            return true;
-        }
-    }
+    if (thiz && IsCantBeAtk) return true;
     return old_get_m_bDontBeAtk(thiz, method_info);
 }
 
@@ -161,12 +133,12 @@ void DrawMenu() {
     // ── HERO ─────────────────────────────────────────────────
     if (ImGui::CollapsingHeader("  HERO", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Checkbox("Invisible (InSkillHide)", &IsInvisible);
-        ImGui::TextDisabled("  Hero masuk stealth — musuh tidak bisa target");
+        ImGui::TextDisabled("  Hero stealth — musuh tidak bisa target");
 
         ImGui::Spacing();
 
         ImGui::Checkbox("Cant Be Attacked", &IsCantBeAtk);
-        ImGui::TextDisabled("  Musuh tidak bisa menyerang hero (m_bDontBeAtk)");
+        ImGui::TextDisabled("  Musuh tidak bisa menyerang hero");
     }
 
     ImGui::End();
@@ -269,31 +241,23 @@ void* hack_thread(void*) {
     Il2CppAttach("liblogic.so");
     sleep(10);
 
-    // Resolve local player detector (tidak di-hook, hanya dipanggil)
-    // dump.cs: public virtual Boolean get_bIsMainEntity() argsCount=0
-    fn_IsMainEntity = (bool(*)(void*, void*)) Il2CppGetMethodOffset(
-        "Assembly-CSharp.dll", "Battle", "LogicEntityBase", "get_bIsMainEntity", 0);
-
     // [1] Map Hack — get_m_CanSight (virtual), argsCount=0
-    // Berlaku semua entity (intentional)
     SafeHook(
         (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "get_m_CanSight", 0),
         (void*)my_get_m_CanSight, (void**)&old_get_m_CanSight
     );
 
-    // [2] Invisible — InSkillHide() BUKAN get_m_bSkillHide()
-    // FIX: InSkillHide() adalah method yg dipanggil engine/AI untuk cek stealth
-    // get_m_bSkillHide() hanya raw getter — il2cpp bypass via direct field read
-    // dump.cs: public Boolean InSkillHide() argsCount=0
+    // [2] Invisible — InSkillHide(), argsCount=0
+    // FIX v3: TANPA local player filter — fail-open
+    // (v2 bug: fn_IsMainEntity null → kondisi if SELALU false → hook skip)
     SafeHook(
         (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "InSkillHide", 0),
         (void*)my_InSkillHide, (void**)&old_InSkillHide
     );
 
-    // [3] Cant Be Attacked — get_m_bDontBeAtk()
-    // FIX: Menggantikan Fake Death yang server-controlled
-    // get_m_bDontBeAtk() dicek targeting system sebelum musuh bisa attack
-    // dump.cs: public Boolean get_m_bDontBeAtk() argsCount=0
+    // [3] Cant Be Attacked — get_m_bDontBeAtk(), argsCount=0
+    // FIX v3: TANPA local player filter — fail-open
+    // (v2 bug: fn_IsMainEntity null → kondisi if SELALU false → hook skip)
     SafeHook(
         (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "get_m_bDontBeAtk", 0),
         (void*)my_get_m_bDontBeAtk, (void**)&old_get_m_bDontBeAtk
