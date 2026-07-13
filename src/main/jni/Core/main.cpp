@@ -57,14 +57,16 @@ static void SafeHook(void* addr, void* replace, void** origin) {
 }
 
 // ═════════════════════════════════════════════════════════════
-// FITUR — hanya Map Hack (stable, sudah terbukti tidak FC)
-// Fitur lain dihapus sementara selagi investigasi MethodInfo* fix
+// FITUR
 // Class: Battle.LogicFighter | Assembly-CSharp.dll
+// WAJIB: semua il2cpp hook punya hidden param MethodInfo* di akhir
+// Signature BENAR: (void* thiz, void* method_info)
 // ═════════════════════════════════════════════════════════════
 
-// ── [1] Map Hack ─────────────────────────────────────────────
-// dump.cs line 550212: public virtual Boolean get_m_CanSight()
-// argsCount=0 | BENAR: (thiz, method_info) — il2cpp hidden param
+// ── [1] Map Hack ──────────────────────────────────────────────
+// dump.cs line 550212
+// public virtual Boolean get_m_CanSight()
+// argsCount=0 | return bool
 bool IsMapHack = false;
 bool (*old_get_m_CanSight)(void* thiz, void* method_info);
 bool my_get_m_CanSight(void* thiz, void* method_info) {
@@ -72,18 +74,58 @@ bool my_get_m_CanSight(void* thiz, void* method_info) {
     return old_get_m_CanSight(thiz, method_info);
 }
 
+// ── [2] Invisible / Stealth ───────────────────────────────────
+// dump.cs line 550216
+// public Boolean get_m_bSkillHide()
+// argsCount=0 | return bool
+// Effect: hero masuk mode stealth (masuk semak) terus-menerus
+//         musuh tidak bisa target/lihat hero
+bool IsInvisible = false;
+bool (*old_get_m_bSkillHide)(void* thiz, void* method_info);
+bool my_get_m_bSkillHide(void* thiz, void* method_info) {
+    if (thiz && IsInvisible) return true;
+    return old_get_m_bSkillHide(thiz, method_info);
+}
+
+// ── [3] Fake Death ───────────────────────────────────────────
+// dump.cs line 550222
+// public Boolean get_m_bFakeDeath()
+// argsCount=0 | return bool
+// Effect: game anggap hero sudah mati (pasif tertentu seperti Uranus/Esmeralda)
+//         musuh tidak bisa target, tapi hero masih bisa bergerak
+bool IsFakeDeath = false;
+bool (*old_get_m_bFakeDeath)(void* thiz, void* method_info);
+bool my_get_m_bFakeDeath(void* thiz, void* method_info) {
+    if (thiz && IsFakeDeath) return true;
+    return old_get_m_bFakeDeath(thiz, method_info);
+}
+
 // ═════════════════════════════════════════════════════════════
 // MENU
 // ═════════════════════════════════════════════════════════════
 void DrawMenu() {
-    ImGui::SetNextWindowSize(ImVec2(780, 250), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(780, 380), ImGuiCond_Once);
     ImGui::Begin("MLBB MOD MENU v2.1.88", nullptr, ImGuiWindowFlags_NoCollapse);
 
+    // ── MAP ──────────────────────────────────────────────────
     if (ImGui::CollapsingHeader("  MAP", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Checkbox("Map Hack", &IsMapHack);
+        ImGui::TextDisabled("  Lihat semua musuh di minimap");
     }
 
-    ImGui::TextDisabled("Versi stable - fitur lain coming soon");
+    ImGui::Spacing();
+
+    // ── HERO ─────────────────────────────────────────────────
+    if (ImGui::CollapsingHeader("  HERO", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Checkbox("Invisible (Skill Hide)", &IsInvisible);
+        ImGui::TextDisabled("  Hero masuk stealth, musuh tidak bisa target");
+
+        ImGui::Spacing();
+
+        ImGui::Checkbox("Fake Death", &IsFakeDeath);
+        ImGui::TextDisabled("  Hero tampak mati, musuh tidak bisa serang");
+    }
+
     ImGui::End();
 }
 
@@ -177,17 +219,29 @@ void* imgui_go(void*) {
 }
 
 // ═════════════════════════════════════════════════════════════
-// HACK THREAD — hanya Map Hack
+// HACK THREAD
 // ═════════════════════════════════════════════════════════════
 void* hack_thread(void*) {
     do { libBaseAddress = findLibrary(LIB); } while (!libBaseAddress);
     Il2CppAttach("liblogic.so");
     sleep(10);
 
-    // [1] Map Hack — get_m_CanSight, argsCount=0
+    // [1] Map Hack — get_m_CanSight, argsCount=0, bool
     SafeHook(
         (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "get_m_CanSight", 0),
         (void*)my_get_m_CanSight, (void**)&old_get_m_CanSight
+    );
+
+    // [2] Invisible — get_m_bSkillHide, argsCount=0, bool
+    SafeHook(
+        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "get_m_bSkillHide", 0),
+        (void*)my_get_m_bSkillHide, (void**)&old_get_m_bSkillHide
+    );
+
+    // [3] Fake Death — get_m_bFakeDeath, argsCount=0, bool
+    SafeHook(
+        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "get_m_bFakeDeath", 0),
+        (void*)my_get_m_bFakeDeath, (void**)&old_get_m_bFakeDeath
     );
 
     pthread_exit(nullptr);
