@@ -57,35 +57,135 @@ static void SafeHook(void* addr, void* replace, void** origin) {
 }
 
 // ═════════════════════════════════════════════════════════════
-// FITUR — ISOLASI TOTAL: hanya Attack Speed
-// dump.cs line 550262: public virtual Double get_m_AtkSpeed()
-// Battle.LogicFighter, Assembly-CSharp.dll, argsCount=0
+// FITUR — dikonfirmasi dari dump.cs v2.1.88.12027
+// Class: Battle.LogicFighter | Assembly: Assembly-CSharp.dll
+//
+// FIX KRITIS: il2cpp ABI selalu tambahkan hidden parameter
+// "MethodInfo*" di akhir setiap method signature.
+// Contoh nyata dari il2cpp guide:
+//   C#: double get_m_AtkSpeed()
+//   C++: double get_m_AtkSpeed(void* thiz, void* method_info)
+// Tanpa method_info → stack corruption → FC saat masuk ingame
 // ═════════════════════════════════════════════════════════════
 
+// ── [1] Map Hack ─────────────────────────────────────────────
+// dump.cs line 550212: public virtual Boolean get_m_CanSight()
+// argsCount=0 — SIGNATURE BENAR: (thiz, method_info)
+bool IsMapHack = false;
+bool (*old_get_m_CanSight)(void* thiz, void* method_info);
+bool my_get_m_CanSight(void* thiz, void* method_info) {
+    if (thiz && IsMapHack) return true;
+    return old_get_m_CanSight(thiz, method_info);
+}
+
+// ── [2] Speed Hack ────────────────────────────────────────────
+// dump.cs line 550303: public Double CalcRealSpeed(Int32 value)
+// argsCount=1 — SIGNATURE BENAR: (thiz, value, method_info)
+bool IsSpeedHack = false;
+float SpeedMultiplier = 2.0f;
+double (*old_CalcRealSpeed)(void* thiz, int32_t value, void* method_info);
+double my_CalcRealSpeed(void* thiz, int32_t value, void* method_info) {
+    double base = old_CalcRealSpeed(thiz, value, method_info);
+    if (thiz && IsSpeedHack) return base * (double)SpeedMultiplier;
+    return base;
+}
+
+// ── [3] Attack Range Hack ─────────────────────────────────────
+// dump.cs line 556311: public virtual Double GetAttackRange()
+// argsCount=0 — SIGNATURE BENAR: (thiz, method_info)
+bool IsAttackRange = false;
+float RangeMultiplier = 3.0f;
+double (*old_GetAttackRange)(void* thiz, void* method_info);
+double my_GetAttackRange(void* thiz, void* method_info) {
+    double base = old_GetAttackRange(thiz, method_info);
+    if (thiz && IsAttackRange) return base * (double)RangeMultiplier;
+    return base;
+}
+
+// ── [4] Attack Speed Hack ─────────────────────────────────────
+// dump.cs line 550262: public virtual Double get_m_AtkSpeed()
+// argsCount=0 — SIGNATURE BENAR: (thiz, method_info)
 bool IsAtkSpeed = false;
 float AtkSpeedMult = 3.0f;
-double (*old_get_m_AtkSpeed)(void* thiz);
-double my_get_m_AtkSpeed(void* thiz) {
-    double base = old_get_m_AtkSpeed(thiz);
+double (*old_get_m_AtkSpeed)(void* thiz, void* method_info);
+double my_get_m_AtkSpeed(void* thiz, void* method_info) {
+    double base = old_get_m_AtkSpeed(thiz, method_info);
     if (thiz && IsAtkSpeed) return base * (double)AtkSpeedMult;
     return base;
+}
+
+// ── [5] No Cooldown ───────────────────────────────────────────
+// dump.cs line 550316: public Double GetCoolPer()
+// argsCount=0 — SIGNATURE BENAR: (thiz, method_info)
+bool IsNoCooldown = false;
+double (*old_GetCoolPer)(void* thiz, void* method_info);
+double my_GetCoolPer(void* thiz, void* method_info) {
+    if (thiz && IsNoCooldown) return 0.0;
+    return old_GetCoolPer(thiz, method_info);
+}
+
+// ── [6] No Mana Cost ──────────────────────────────────────────
+// dump.cs line 550313: public Double GetMpCostPer()
+// argsCount=0 — SIGNATURE BENAR: (thiz, method_info)
+bool IsNoMana = false;
+double (*old_GetMpCostPer)(void* thiz, void* method_info);
+double my_GetMpCostPer(void* thiz, void* method_info) {
+    if (thiz && IsNoMana) return 0.0;
+    return old_GetMpCostPer(thiz, method_info);
+}
+
+// ── [7] Can't Be Attacked ─────────────────────────────────────
+// dump.cs line 550220: public Boolean get_m_bDontBeAtk()
+// argsCount=0 — SIGNATURE BENAR: (thiz, method_info)
+bool IsDontBeAtk = false;
+bool (*old_get_m_bDontBeAtk)(void* thiz, void* method_info);
+bool my_get_m_bDontBeAtk(void* thiz, void* method_info) {
+    if (thiz && IsDontBeAtk) return true;
+    return old_get_m_bDontBeAtk(thiz, method_info);
 }
 
 // ═════════════════════════════════════════════════════════════
 // MENU
 // ═════════════════════════════════════════════════════════════
 void DrawMenu() {
-    ImGui::SetNextWindowSize(ImVec2(780, 300), ImGuiCond_Once);
-    ImGui::Begin("MLBB MOD — ATK SPEED TEST", nullptr, ImGuiWindowFlags_NoCollapse);
+    ImGui::SetNextWindowSize(ImVec2(780, 860), ImGuiCond_Once);
+    ImGui::Begin("MLBB MOD MENU v2.1.88", nullptr, ImGuiWindowFlags_NoCollapse);
 
-    if (ImGui::CollapsingHeader("  COMBAT", ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::Checkbox("Attack Speed Hack", &IsAtkSpeed);
-        if (IsAtkSpeed) {
-            ImGui::SliderFloat("Atk Speed x", &AtkSpeedMult, 1.0f, 5.0f);
+    // MAP
+    if (ImGui::CollapsingHeader("  MAP", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Checkbox("Map Hack", &IsMapHack);
+    }
+
+    // MOVEMENT
+    if (ImGui::CollapsingHeader("  MOVEMENT", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Checkbox("Speed Hack", &IsSpeedHack);
+        if (IsSpeedHack) {
+            ImGui::SliderFloat("Speed x", &SpeedMultiplier, 1.0f, 5.0f);
         }
     }
 
-    ImGui::TextDisabled("Hanya 1 hook aktif: get_m_AtkSpeed");
+    // COMBAT
+    if (ImGui::CollapsingHeader("  COMBAT", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Checkbox("Attack Range", &IsAttackRange);
+        if (IsAttackRange) {
+            ImGui::SliderFloat("Range x", &RangeMultiplier, 1.0f, 8.0f);
+        }
+        ImGui::Separator();
+        ImGui::Checkbox("Attack Speed", &IsAtkSpeed);
+        if (IsAtkSpeed) {
+            ImGui::SliderFloat("Atk Speed x", &AtkSpeedMult, 1.0f, 5.0f);
+        }
+        ImGui::Separator();
+        ImGui::Checkbox("No Cooldown", &IsNoCooldown);
+        ImGui::Separator();
+        ImGui::Checkbox("No Mana Cost", &IsNoMana);
+    }
+
+    // DEFENSE
+    if (ImGui::CollapsingHeader("  DEFENSE", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Checkbox("Can't Be Attacked", &IsDontBeAtk);
+    }
+
     ImGui::End();
 }
 
@@ -179,28 +279,56 @@ void* imgui_go(void*) {
 }
 
 // ═════════════════════════════════════════════════════════════
-// HACK THREAD — ISOLASI TOTAL: 1 hook saja
-// sleep(10) tetap ada
+// HACK THREAD — semua 7 fitur aktif
+// sleep(10): tunggu game selesai loading
+// FIX: semua hook pakai signature il2cpp yang benar (+ method_info)
 // ═════════════════════════════════════════════════════════════
 void* hack_thread(void*) {
     do { libBaseAddress = findLibrary(LIB); } while (!libBaseAddress);
     Il2CppAttach("liblogic.so");
     sleep(10);
 
-    // HANYA INI YANG AKTIF:
+    // [1] Map Hack — get_m_CanSight, argsCount=0
+    SafeHook(
+        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "get_m_CanSight", 0),
+        (void*)my_get_m_CanSight, (void**)&old_get_m_CanSight
+    );
+
+    // [2] Speed Hack — CalcRealSpeed(Int32), argsCount=1
+    SafeHook(
+        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "CalcRealSpeed", 1),
+        (void*)my_CalcRealSpeed, (void**)&old_CalcRealSpeed
+    );
+
+    // [3] Attack Range — GetAttackRange, argsCount=0
+    SafeHook(
+        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "GetAttackRange", 0),
+        (void*)my_GetAttackRange, (void**)&old_GetAttackRange
+    );
+
     // [4] Attack Speed — get_m_AtkSpeed, argsCount=0
     SafeHook(
         (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "get_m_AtkSpeed", 0),
         (void*)my_get_m_AtkSpeed, (void**)&old_get_m_AtkSpeed
     );
 
-    // SEMUA DISABLED:
-    // [1] Map Hack      (get_m_CanSight)
-    // [2] Speed Hack    (CalcRealSpeed)
-    // [3] Attack Range  (GetAttackRange)
-    // [5] No Cooldown   (GetCoolPer)
-    // [6] No Mana Cost  (GetMpCostPer)
-    // [7] Cant Be Atk   (get_m_bDontBeAtk)
+    // [5] No Cooldown — GetCoolPer, argsCount=0
+    SafeHook(
+        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "GetCoolPer", 0),
+        (void*)my_GetCoolPer, (void**)&old_GetCoolPer
+    );
+
+    // [6] No Mana Cost — GetMpCostPer, argsCount=0
+    SafeHook(
+        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "GetMpCostPer", 0),
+        (void*)my_GetMpCostPer, (void**)&old_GetMpCostPer
+    );
+
+    // [7] Can't Be Attacked — get_m_bDontBeAtk, argsCount=0
+    SafeHook(
+        (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "get_m_bDontBeAtk", 0),
+        (void*)my_get_m_bDontBeAtk, (void**)&old_get_m_bDontBeAtk
+    );
 
     pthread_exit(nullptr);
 }
