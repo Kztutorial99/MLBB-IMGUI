@@ -119,7 +119,11 @@ public:
 //   bInQueue, isInFirstDragRange, firstTarget, keyState,
 //   bIgnoreQueue, dragTime, uiCastTime, uiOperflag)
 // offset dari dump: 0xffffffff8c4dba64
-#define ShowUnitAIComp_Update (uintptr_t) Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "ShowUnitAIComp", "Update")
+// ShowUnitAIComp::Update = inherited method (// 0x0 di dump)
+// Il2CppGetMethodOffset return 0 karena method tidak di-override langsung di class ini.
+// Offset dikonfirmasi dari IL2CPP Tool v2.1.88 in-game: 0xFFFFFFFFAF923C28
+// GetRealOffsets(lib, 0xAF923C28) = libBase + 0xAF923C28 (lower 32-bit dari offset dump)
+#define ShowUnitAIComp_Update (uintptr_t) Tools::GetRealOffsets(m_IL2CPPLIB, 0xAF923C28)
 #define ShowUnitAIComp_TryUseSkill (uintptr_t) Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "ShowUnitAIComp", "TryUseSkill", 16)
 
 //Class Bullet
