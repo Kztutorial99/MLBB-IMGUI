@@ -113,18 +113,18 @@ public:
 
 #define CoolDownData_GetCoolTime (uintptr_t) Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "CoolDownData", "GetCoolTime")
 
-// Class Battle.ShowUnitAIComp — TryUseSkill hook
-// v2.1.88: TryUseSkill berada di Battle.ShowUnitAIComp (BUKAN ShowPlayer).
-// 16-param: (state*, skillId, dir, dirDefault, pos, bCommonAtk, bAuto, bAlong,
-//   bInQueue, isInFirstDragRange, firstTarget, keyState,
-//   bIgnoreQueue, dragTime, uiCastTime, uiOperflag)
-// offset dari dump: 0xffffffff8c4dba64
+// Class Battle.ShowUnitAIComp — ExecuteAttack hook
+// v2.1.88: TryUseSkill DIGANTI NAMA jadi ExecuteAttack di ShowUnitAIComp.
+// 23-param: (location, state*, skillId, dir, dirDefault, pos, bCommonAtk, bAuto, bAlong,
+//   bInQueue, isInFirstDragRange, firstTarget, uTargetGuid, bLockProtect, lockEnemy,
+//   keyState, bIgnoreQueue, dragTime, forceLock, mustSendType, autoAtkFinalCaskSpell, uiCastTime, uiOperflag)
+// Offset confirmed CS dump v2.1.88: 0xFFFFFFFF8C4DD4F0
 // ShowUnitAIComp::Update = inherited method (// 0x0 di dump)
 // Il2CppGetMethodOffset return 0 karena method tidak di-override langsung di class ini.
 // Offset dikonfirmasi dari IL2CPP Tool v2.1.88 in-game: 0xFFFFFFFFAF923C28
 // GetRealOffsets(lib, 0xAF923C28) = libBase + 0xAF923C28 (lower 32-bit dari offset dump)
 #define ShowUnitAIComp_Update (uintptr_t) Tools::GetRealOffsets(m_IL2CPPLIB, 0xAF923C28)
-#define ShowUnitAIComp_TryUseSkill (uintptr_t) Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "ShowUnitAIComp", "TryUseSkill", 16)
+#define ShowUnitAIComp_ExecuteAttack (uintptr_t) Tools::GetRealOffsets(m_IL2CPPLIB, 0x8C4DD4F0)
 
 //Class Bullet
 #define Bullet_m_Id (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "Battle", "Bullet", "m_Id")
