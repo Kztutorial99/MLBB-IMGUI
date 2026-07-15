@@ -113,12 +113,14 @@ public:
 
 #define CoolDownData_GetCoolTime (uintptr_t) Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "CoolDownData", "GetCoolTime")
 
-// Class ShowPlayer — TryUseSkill hook
-// UPDATED v2.1.88: TryUseSkill moved from Battle.ShowUnitAIComp to ShowPlayer.
-// Using 9-param overload (index 1): TryUseSkill(skillId, dir, dirDefault, pos,
-// bCommonAttack, bAlong, isInFirstDragRange, bIgnoreQueue, dragTime)
+// Class Battle.ShowUnitAIComp — TryUseSkill hook
+// v2.1.88: TryUseSkill berada di Battle.ShowUnitAIComp (BUKAN ShowPlayer).
+// 16-param: (state*, skillId, dir, dirDefault, pos, bCommonAtk, bAuto, bAlong,
+//   bInQueue, isInFirstDragRange, firstTarget, keyState,
+//   bIgnoreQueue, dragTime, uiCastTime, uiOperflag)
+// offset dari dump: 0xffffffff8c4dba64
 #define ShowUnitAIComp_Update (uintptr_t) Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "ShowUnitAIComp", "Update")
-#define ShowUnitAIComp_TryUseSkill (uintptr_t) Il2CppGetMethodOffset("Assembly-CSharp.dll", "", "ShowPlayer", "TryUseSkill", 9)
+#define ShowUnitAIComp_TryUseSkill (uintptr_t) Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "ShowUnitAIComp", "TryUseSkill", 16)
 
 //Class Bullet
 #define Bullet_m_Id (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "Battle", "Bullet", "m_Id")
