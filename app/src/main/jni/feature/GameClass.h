@@ -74,21 +74,26 @@ public:
 
 #define BattleManager_Update (uintptr_t) Il2CppGetMethodOffset("Assembly-CSharp.dll", "", "BattleManager", "Update")
 
-//Class ShowEntity
-#define ShowEntity__Position (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "", "ShowEntity", "_Position")
+// Class ShowEntity
+// UPDATED v2.1.88: _Position renamed to m_EntityObjPos; all EntityBase_* now
+// resolved from ShowEntity (EntityBase was refactored out in this version).
+#define ShowEntity__Position (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "", "ShowEntity", "m_EntityObjPos")
 #define ShowEntity_m_RoleName (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "", "ShowEntity", "m_RoleName")
 #define ShowEntity__logicFighter (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "", "ShowEntity", "_logicFighter")
 
-//Class EntityBase
-#define EntityBase_m_bSameCampType (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "Battle", "EntityBase", "m_bSameCampType")
-#define EntityBase_m_IsDeathProgress (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "Battle", "EntityBase", "m_IsDeathProgress")
-#define EntityBase_m_bDeath (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "Battle", "EntityBase", "<m_bDeath>k__BackingField")
-#define EntityBase_canSight (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "Battle", "EntityBase", "canSight")
-#define EntityBase_m_Hp (uintptr_t)  Il2CppGetFieldOffset("Assembly-CSharp.dll", "Battle", "EntityBase", "m_Hp")
-#define EntityBase_m_HpMax (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "Battle", "EntityBase", "m_HpMax")
-#define EntityBase_m_ID (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "Battle", "EntityBase", "m_ID")
-#define EntityBase_m_uGuid (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "Battle", "EntityBase", "m_uGuid")
-#define EntityBase_m_Level (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "Battle", "EntityBase", "m_Level")
+// Class ShowEntity — entity state fields
+// (previously sourced from Battle.EntityBase which no longer exists as a
+//  separate class in Assembly-CSharp metadata for this game version;
+//  fields are now directly declared on ShowEntity)
+#define EntityBase_m_bSameCampType (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "", "ShowEntity", "m_bSameCampType")
+#define EntityBase_m_IsDeathProgress (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "", "ShowEntity", "m_bDeadAnima")
+#define EntityBase_m_bDeath (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "", "ShowEntity", "m_bDeath")
+#define EntityBase_canSight (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "", "ShowEntity", "canSight")
+#define EntityBase_m_Hp (uintptr_t)  Il2CppGetFieldOffset("Assembly-CSharp.dll", "", "ShowEntity", "m_Hp")
+#define EntityBase_m_HpMax (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "", "ShowEntity", "m_HpMax")
+#define EntityBase_m_ID (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "", "ShowEntity", "m_ID")
+#define EntityBase_m_uGuid (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "", "ShowEntity", "m_uGuid")
+#define EntityBase_m_Level (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "", "ShowEntity", "m_Level")
 
 //Class ShowPlayer
 #define ShowPlayer_m_HeroName (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "", "ShowPlayer", "m_HeroName")
@@ -96,8 +101,9 @@ public:
 //Class LogicFighter
 #define LogicFighter_m_SkillComp (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "m_SkillComp")
 
-//Class LogicPlayer
-#define LogicPlayer_m_KillWildTimes (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "Battle", "LogicPlayer", "m_KillWildTimes")
+// Class LogicFighter (was LogicPlayer in older versions — m_KillWildTimes now
+// lives on Battle.LogicFighter and its subclasses)
+#define LogicPlayer_m_KillWildTimes (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "Battle", "LogicFighter", "m_KillWildTimes")
 
 //Class LogicSkillComp
 #define LogicSkillComp_m_CoolDownComp (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "Battle", "LogicSkillComp", "m_CoolDownComp")
@@ -107,9 +113,12 @@ public:
 
 #define CoolDownData_GetCoolTime (uintptr_t) Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "CoolDownData", "GetCoolTime")
 
-//Class ShowUnitAIComp
+// Class ShowPlayer — TryUseSkill hook
+// UPDATED v2.1.88: TryUseSkill moved from Battle.ShowUnitAIComp to ShowPlayer.
+// Using 9-param overload (index 1): TryUseSkill(skillId, dir, dirDefault, pos,
+// bCommonAttack, bAlong, isInFirstDragRange, bIgnoreQueue, dragTime)
 #define ShowUnitAIComp_Update (uintptr_t) Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "ShowUnitAIComp", "Update")
-#define ShowUnitAIComp_TryUseSkill (uintptr_t) Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "ShowUnitAIComp", "TryUseSkill", 8)
+#define ShowUnitAIComp_TryUseSkill (uintptr_t) Il2CppGetMethodOffset("Assembly-CSharp.dll", "", "ShowPlayer", "TryUseSkill", 9)
 
 //Class Bullet
 #define Bullet_m_Id (uintptr_t) Il2CppGetFieldOffset("Assembly-CSharp.dll", "Battle", "Bullet", "m_Id")
