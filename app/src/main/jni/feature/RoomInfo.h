@@ -33,12 +33,12 @@ void RoomInfoList() {
             if (GetBattlePlayerInfo) {
                 int PlayerB = 0, PlayerR = 0;
                 int iSelfCamp = -1;
-                int m_uiID = *(int *)(SystemData_m_uiID);
+                uint64_t m_uiID = *(uint64_t *)(SystemData_m_uiID);
                 for (int i = 0; i < GetBattlePlayerInfo->getSize(); i++) {
                     auto Pawn = GetBattlePlayerInfo->getItems()[i];
                     if (!Pawn) continue;
                     auto iCamp = *(int *) ((uintptr_t)Pawn + SystemData_RoomData_iCamp);
-                    auto lUid = *(int *) ((uintptr_t)Pawn + SystemData_RoomData_lUid);
+                    auto lUid = *(uint64_t *) ((uintptr_t)Pawn + SystemData_RoomData_lUid);
                     if (lUid != m_uiID) continue;
                     iSelfCamp = iCamp;
                     break;
