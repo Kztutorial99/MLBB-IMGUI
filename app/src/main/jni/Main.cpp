@@ -368,8 +368,13 @@ void *main_thread(void *) {
     { uintptr_t _bmu = BattleManager_Update;
       if (_bmu) Tools::Hook((void *) _bmu, (void *) UpdateMapHack, (void **) &orig_UpdateMapHack); }
 
-    Tools::Hook((void *) ShowUnitAIComp_TryUseSkill, (void *) TryUseSkill, (void **) &orig_TryUseSkill);
-    Tools::Hook((void *) ShowUnitAIComp_Update, (void *) UpdateRetribution, (void **) &orig_UpdateRetribution);
+    // Bug#2 guard: TryUseSkill punya valid offset, guard untuk safety
+    { uintptr_t _suat = ShowUnitAIComp_TryUseSkill;
+      if (_suat) Tools::Hook((void *) _suat, (void *) TryUseSkill, (void **) &orig_TryUseSkill); }
+    // Bug#2 fix: ShowUnitAIComp.Update TIDAK ADA di v2.1.88 -> offset 0 -> Dobby crash.
+    // UpdateRetribution (auto-smite) di-disable sampai ditemukan hook alternatif.
+    { uintptr_t _suau = ShowUnitAIComp_Update;
+      if (_suau) Tools::Hook((void *) _suau, (void *) UpdateRetribution, (void **) &orig_UpdateRetribution); }
 
     Tools::Hook((void *) SystemData_GetHeroSkin, (void *) GetHeroSkin, (void **) &oGetHeroSkin);
     Tools::Hook((void *) SystemData_GetMCLimitSkin, (void *) GetMCLimitSkin, (void **) &oGetMCLimitSkin);
@@ -390,11 +395,17 @@ void *main_thread(void *) {
     Tools::Hook((void *) UIRankHero_ChangeShow_SendUseSkin, (void *) SendUseSkin, (void **) &oSendUseSkin);
 
     Tools::Hook((void *) BattleReceiveMessage_SetPlayerData, (void *) SetPlayerData, (void **) &oSetPlayerData);
-    Tools::Hook((void *) BattleReceiveMessage_SetPlayerData_, (void *) SetPlayerData_, (void **) &oSetPlayerData_);
+    // Bug#4 fix: SetPlayerData 1-param tidak ada di v2.1.88 -> offset 0.
+    { uintptr_t _spd_ = BattleReceiveMessage_SetPlayerData_;
+      if (_spd_) Tools::Hook((void *) _spd_, (void *) SetPlayerData_, (void **) &oSetPlayerData_); }
     Tools::Hook((void *) BattleReceiveMessage_AddPlayerInfo, (void *) AddPlayerInfo, (void **) &oAddPlayerInfo);
-    Tools::Hook((void *) BattleReceiveMessage_AddPlayerInfo_, (void *) AddPlayerInfo_, (void **) &oAddPlayerInfo_);
+    // Bug#3 fix: AddPlayerInfo 2-param tidak ada di v2.1.88 -> offset 0.
+    { uintptr_t _api_ = BattleReceiveMessage_AddPlayerInfo_;
+      if (_api_) Tools::Hook((void *) _api_, (void *) AddPlayerInfo_, (void **) &oAddPlayerInfo_); }
 
-    Tools::Hook((void *) GameServerConfig_SendRawData, (void *) SendRawData, (void **) &oSendRawData);
+    // Bug#5 fix: GameServerConfig.SendRawData tidak ada di v2.1.88 -> offset 0.
+    { uintptr_t _gsr = GameServerConfig_SendRawData;
+      if (_gsr) Tools::Hook((void *) _gsr, (void *) SendRawData, (void **) &oSendRawData); }
 
     pthread_t t;
     return 0;
