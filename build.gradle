@@ -1,37 +1,23 @@
-apply plugin: 'com.android.application'
+buildscript {
+    ext.build_gradle_version = '4.2.2'
 
-android {
-    compileSdkVersion 30
-    defaultConfig {
-        applicationId "com.android.support"
-        minSdkVersion 19
-        targetSdkVersion 30
-        versionCode 1
-        versionName "3.2"
-        ndk {
-            abiFilters 'arm64-v8a'
-        }
-        signingConfig signingConfigs.debug
+    repositories {
+        google()
+        jcenter()
     }
-    buildTypes {
-        release {
-            shrinkResources false
-            minifyEnabled false
-            path file('src/main/jni/Android.mk')
-            version "3.18.1"
-        }
-        debug {
-            shrinkResources false
-            minifyEnabled false
-        }
+    dependencies {
+        classpath "com.android.tools.build:gradle:$build_gradle_version"
+        
     }
-    externalNativeBuild {
-        ndkBuild {
-            path file('src/main/jni/Android.mk')
-        }
-    }
-	ndkVersion = '22.0.7026061'
+    
 }
-dependencies {
-    implementation fileTree(dir: 'libs', include: ['*.jar'])
+allprojects {
+    repositories {
+        google()
+        jcenter()
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
 }

@@ -1,109 +1,38 @@
-# MLBB ImGui — Mobile Legends Bang Bang ImGui Mod
+# ImGui Unity Template by DivaArvian
+> 2022/07/31 14:32: Initial Commit (with imgui v1.85).
 
-> ⚠️ **Untuk Agent / Contributor Baru — Baca Ini Dulu!**
+> Soon Update with new version imgui.
 
-## 🔧 Build Environment
+# What is ImGui?
+ImGui is basically a full stack GUI framework made with c++ which supports lots of operating systems
 
-Project ini **dibangun menggunakan [AIDE PRO](https://www.android-ide.com/)** langsung dari **HP Android** — bukan PC, bukan Android Studio, bukan terminal Linux.
+# Why ImGui?
+As Its a full stack Framework we/you can easily make lots of things from it easily and it can save lot of time
 
-### Workflow Build:
-1. `git clone https://github.com/Kztutorial99/MLBB-IMGUI.git` di AIDE PRO
-2. Buka project di AIDE PRO
-3. Build langsung dari HP Android
+# How it Works ?
+Yes , While Talking about its working method currently we use egl to hook with our EGLSurface or Simply It uses `eglSwapBuffers` with Dobby Hook
+  
+# How is it's touch Managed?
+Currently it uses the touch from game itself, like Unity structure for touch so it gets easy for us to Handle it
 
-## ⚠️ Penting untuk Agent / Developer
+# How to inject / implement
+1. Extract the lib from your deired Architecture or simply `armeabi-v7a`
+2. Place your lib in correct path of the game.
+3. Load your Lib from `onCreate` of your Game's Mainactivity or UnityPlayerActivity
 
-| ❌ Jangan | ✅ Lakukan |
-|-----------|-----------|
-| Sarankan build via terminal/CLI | Sesuaikan dengan AIDE PRO build system |
-| Sarankan Android Studio | Gunakan AIDE PRO |
-| Ubah struktur folder sembarangan | Konfirmasi dulu sebelum ubah struktur |
-| Sarankan Gradle dari PC | Build system sudah diatur untuk AIDE PRO |
-
----
-
-## 🎮 Fitur Mod Menu
-
-| Fitur | Kategori | Status |
-|-------|----------|--------|
-| Map Hack | Map | ✅ |
-| God Mode | Battle | ✅ |
-| No Cooldown | Battle | ✅ |
-| Speed Hack | Movement | ✅ |
-
----
-
-## 🔩 Arsitektur Hook (untuk Agent)
-
-Semua fitur menggunakan **ByNameModding IL2CPP framework** + **Dobby hook**.
-
-### Pola wajib setiap fitur baru:
-
-```cpp
-// 1. Global toggle + original pointer
-bool IsFeature = false;
-ReturnType (*old_Method)(void* thiz, args...);
-
-// 2. Hook function
-ReturnType my_Method(void* thiz, args...) {
-    if (thiz != NULL && IsFeature) { return modifiedValue; }
-    return old_Method(thiz, args...);  // selalu panggil original jika off
-}
-
-// 3. Checkbox di DrawMenu()
-ImGui::Checkbox("Label", &IsFeature);
-
-// 4. DobbyHook di hack_thread — SETELAH Il2CppAttach + sleep(5)
-DobbyHook(
-    (void*)Il2CppGetMethodOffset("Assembly-CSharp.dll", "Battle", "ClassName", "Method", argsCount),
-    (void*)my_Method,
-    (void**)&old_Method
-);
-```
-
-### ⚠️ Aturan Kritis
-
-- **Semua game hook HANYA di `hack_thread`** — setelah `Il2CppAttach("liblogic.so")` + `sleep(5)`
-- **`Il2CppGetMethodOffset` game TIDAK BOLEH** dipanggil di `imgui_go` atau `SetupImgui`
-- **`argsCount`** = jumlah parameter di dump.cs, **tidak termasuk** `this`
-- **Return type** harus match persis dengan dump.cs
-- **Selalu panggil `old*()`** ketika fitur dimatikan
-
-### Referensi dump.cs
-
-File: `DATA/com.mobile.legends_2.1.88.12027_1783893858261.cs`  
-Game version: **2.1.88.12027**
+The main activity of Unity is: ```com/unity/player/UnityPlayerActivity```
 
 ```
-// Implementasi saat ini:
-public virtual Boolean  get_m_CanSight();                                       // argsCount=0
-public Double           GetMoveSpeed(Boolean bSummonOwner);                     // argsCount=1
-public virtual Void     BeAtkModifyHP(Int32 value, Battle.LogicFighter pAtk);   // argsCount=2
-public Int32            CalcSkillCoolDown(Int32 iCoolDownTime, Int32 iSpellId); // argsCount=2
+const-string v0, "native-lib"
+
+invoke-static {v0}, Ljava/lang/System;->loadLibrary(Ljava/lang/String;)V
 ```
+# Recomendations
 
----
+1. You can open this project using AIDE or Android Studio
+2. If you find bugs relating to this project, simply mention on the same repo so that we can improve it
 
-## 📁 Struktur Project
+# Credits
 
-```
-MLBB-IMGUI/
-├── build.gradle
-├── src/main/jni/
-│   ├── Core/
-│   │   ├── main.cpp          ← file utama mod menu
-│   │   └── Include.h
-│   └── Modules/
-│       ├── Hook/Dobby/       ← Dobby hooking library
-│       ├── ImGui/            ← Dear ImGui
-│       ├── Utils/Unity/ByNameModding/  ← Il2Cpp helper
-│       └── xdl/              ← xdl dynamic linking
-├── DATA/
-│   └── *.cs                  ← IL2CPP dump (referensi offset)
-└── build/bin/
-    └── *.apk
-```
-
----
-
-*Repo dikelola via Replit Agent — edit kode di Replit, push ke GitHub, user git pull di AIDE PRO.*
+* ocornut - ImGui : https://github.com/ocornut/ImGui
+* vvb2060 - DobbyHook - https://github.com/vvb2060/dobby-android
