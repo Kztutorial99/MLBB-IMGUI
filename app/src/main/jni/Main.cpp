@@ -368,9 +368,9 @@ void *main_thread(void *) {
     { uintptr_t _bmu = BattleManager_Update;
       if (_bmu) Tools::Hook((void *) _bmu, (void *) UpdateMapHack, (void **) &orig_UpdateMapHack); }
 
-    // Bug#2 guard: TryUseSkill punya valid offset, guard untuk safety
-    { uintptr_t _suat = ShowUnitAIComp_TryUseSkill;
-      if (_suat) Tools::Hook((void *) _suat, (void *) TryUseSkill, (void **) &orig_TryUseSkill); }
+    // ExecuteAttack = pengganti TryUseSkill di v2.1.88 (23-param, offset 0x8C4DD4F0)
+    { uintptr_t _suat = ShowUnitAIComp_ExecuteAttack;
+      if (_suat) Tools::Hook((void *) _suat, (void *) ExecuteAttack, (void **) &orig_ExecuteAttack); }
     // Bug#2 fix: ShowUnitAIComp.Update TIDAK ADA di v2.1.88 -> offset 0 -> Dobby crash.
     // UpdateRetribution (auto-smite) di-disable sampai ditemukan hook alternatif.
     { uintptr_t _suau = ShowUnitAIComp_Update;
