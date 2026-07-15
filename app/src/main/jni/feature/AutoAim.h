@@ -32,17 +32,19 @@ sAim Aim{0};
 
 static float RangeFOV = 10.0f;
 
-// v2.1.88: TryUseSkill kembali ke Battle.ShowUnitAIComp (BUKAN ShowPlayer).
-// 16-param: (state*, skillId, dir, dirDefault, pos, bCommonAtk, bAuto, bAlong,
-//            bInQueue, isInFirstDragRange, firstTarget, keyState,
-//            bIgnoreQueue, dragTime, uiCastTime, uiOperflag)
-// Nullable<Boolean> keyState -> int (IL2CPP nullable flatten)
-int (*orig_TryUseSkill)(...);
-int TryUseSkill(void *instance, int *state, int skillId, Vector3 dir, bool dirDefault,
-                Vector3 pos, bool bCommonAtk, bool bAuto, bool bAlong, bool bInQueue,
-                bool isInFirstDragRange, unsigned int firstTarget, int keyState,
-                bool bIgnoreQueue, unsigned int dragTime,
-                unsigned int uiCastTime, unsigned int uiOperflag) {
+// v2.1.88: TryUseSkill DIGANTI NAMA jadi ExecuteAttack di ShowUnitAIComp.
+// 23-param: (location, state*, skillId, dir, dirDefault, pos, bCommonAtk, bAuto, bAlong,
+//            bInQueue, isInFirstDragRange, firstTarget, uTargetGuid, bLockProtect, lockEnemy,
+//            keyState, bIgnoreQueue, dragTime, forceLock, mustSendType, autoAtkFinalCaskSpell, uiCastTime, uiOperflag)
+// Offset confirmed CS dump v2.1.88: 0xFFFFFFFF8C4DD4F0 -> GetRealOffsets 0x8C4DD4F0
+int (*orig_ExecuteAttack)(...);
+int ExecuteAttack(void *instance, int location, int *state, int skillId, Vector3 dir, bool dirDefault,
+                  Vector3 pos, bool bCommonAtk, bool bAuto, bool bAlong, bool bInQueue,
+                  bool isInFirstDragRange, unsigned int firstTarget,
+                  unsigned int uTargetGuid, bool bLockProtect, void *lockEnemy,
+                  int keyState, bool bIgnoreQueue, unsigned int dragTime,
+                  bool forceLock, int mustSendType, bool autoAtkFinalCaskSpell,
+                  unsigned int uiCastTime, unsigned int uiOperflag) {
 	bool isDoneAim = false;
     if (instance != NULL) {
         float MaxDist = std::numeric_limits<float>::infinity();
@@ -113,7 +115,7 @@ int TryUseSkill(void *instance, int *state, int skillId, Vector3 dir, bool dirDe
                         auto targetLockPos = Vector3::Normalized(SwordPos - selfPos);
                         if (skillId == 100 * HeroID + 20) {
                             isDoneAim = true;
-							orig_TryUseSkill(instance, state, skillId, targetLockPos, dirDefault, pos, bCommonAtk, bAuto, bAlong, bInQueue, isInFirstDragRange, firstTarget, keyState, bIgnoreQueue, dragTime, uiCastTime, uiOperflag);
+							orig_ExecuteAttack(instance, location, state, skillId, targetLockPos, dirDefault, pos, bCommonAtk, bAuto, bAlong, bInQueue, isInFirstDragRange, firstTarget, 0u, false, nullptr, keyState, bIgnoreQueue, dragTime, false, 0, false, uiCastTime, uiOperflag);
                         }
                     } else if (EntityPos != Vector3::zero()) {
                         auto targetLockPos = Vector3::Normalized(EntityPos - selfPos);
@@ -121,42 +123,42 @@ int TryUseSkill(void *instance, int *state, int skillId, Vector3 dir, bool dirDe
                         if (Aim.Helper.Skills.Basic) {
                             if (skillId == 100 * HeroID + 00) {
                                 isDoneAim = true;
-                                orig_TryUseSkill(instance, state, skillId, targetLockPos, dirDefault, pos, bCommonAtk, bAuto, bAlong, bInQueue, isInFirstDragRange, firstTarget, keyState, bIgnoreQueue, dragTime, uiCastTime, uiOperflag);
+                                orig_ExecuteAttack(instance, location, state, skillId, targetLockPos, dirDefault, pos, bCommonAtk, bAuto, bAlong, bInQueue, isInFirstDragRange, firstTarget, 0u, false, nullptr, keyState, bIgnoreQueue, dragTime, false, 0, false, uiCastTime, uiOperflag);
                             }
                         }
                         //Spell
                         if (Aim.Helper.Skills.Spell) {
                             if (skillId == 20100 || skillId == 20140) {
                                 isDoneAim = true;
-                                orig_TryUseSkill(instance, state, skillId, targetLockPos, dirDefault, pos, bCommonAtk, bAuto, bAlong, bInQueue, isInFirstDragRange, firstTarget, keyState, bIgnoreQueue, dragTime, uiCastTime, uiOperflag);
+                                orig_ExecuteAttack(instance, location, state, skillId, targetLockPos, dirDefault, pos, bCommonAtk, bAuto, bAlong, bInQueue, isInFirstDragRange, firstTarget, 0u, false, nullptr, keyState, bIgnoreQueue, dragTime, false, 0, false, uiCastTime, uiOperflag);
                             }
                         }
                         //Skill 1
                         if (Aim.Helper.Skills.Skill1) {
                             if (skillId == 100 * HeroID + 10) {
                                 isDoneAim = true;
-                                orig_TryUseSkill(instance, state, skillId, targetLockPos, dirDefault, pos, bCommonAtk, bAuto, bAlong, bInQueue, isInFirstDragRange, firstTarget, keyState, bIgnoreQueue, dragTime, uiCastTime, uiOperflag);
+                                orig_ExecuteAttack(instance, location, state, skillId, targetLockPos, dirDefault, pos, bCommonAtk, bAuto, bAlong, bInQueue, isInFirstDragRange, firstTarget, 0u, false, nullptr, keyState, bIgnoreQueue, dragTime, false, 0, false, uiCastTime, uiOperflag);
                             }
                         }
                         //Skill 2
                         if (Aim.Helper.Skills.Skill2) {
                             if (skillId == 100 * HeroID + 20 || skillId == 2010520 /*Beatrix Skill2*/) {
                                 isDoneAim = true;
-                                orig_TryUseSkill(instance, state, skillId, targetLockPos, dirDefault, pos, bCommonAtk, bAuto, bAlong, bInQueue, isInFirstDragRange, firstTarget, keyState, bIgnoreQueue, dragTime, uiCastTime, uiOperflag);
+                                orig_ExecuteAttack(instance, location, state, skillId, targetLockPos, dirDefault, pos, bCommonAtk, bAuto, bAlong, bInQueue, isInFirstDragRange, firstTarget, 0u, false, nullptr, keyState, bIgnoreQueue, dragTime, false, 0, false, uiCastTime, uiOperflag);
                             }
                         }
                         //Skill 3
                         if (Aim.Helper.Skills.Skill3) {
                             if (skillId == 100 * HeroID + 30 || skillId == 2010530 /*Beatrix Ulti*/) {
                                 isDoneAim = true;
-                                orig_TryUseSkill(instance, state, skillId, targetLockPos, dirDefault, pos, bCommonAtk, bAuto, bAlong, bInQueue, isInFirstDragRange, firstTarget, keyState, bIgnoreQueue, dragTime, uiCastTime, uiOperflag);
+                                orig_ExecuteAttack(instance, location, state, skillId, targetLockPos, dirDefault, pos, bCommonAtk, bAuto, bAlong, bInQueue, isInFirstDragRange, firstTarget, 0u, false, nullptr, keyState, bIgnoreQueue, dragTime, false, 0, false, uiCastTime, uiOperflag);
                             }
                         }
                         //Skill 4
                         if (Aim.Helper.Skills.Skill4) {
                             if (skillId == 100 * HeroID + 40) {
                                 isDoneAim = true;
-                                orig_TryUseSkill(instance, state, skillId, targetLockPos, dirDefault, pos, bCommonAtk, bAuto, bAlong, bInQueue, isInFirstDragRange, firstTarget, keyState, bIgnoreQueue, dragTime, uiCastTime, uiOperflag);
+                                orig_ExecuteAttack(instance, location, state, skillId, targetLockPos, dirDefault, pos, bCommonAtk, bAuto, bAlong, bInQueue, isInFirstDragRange, firstTarget, 0u, false, nullptr, keyState, bIgnoreQueue, dragTime, false, 0, false, uiCastTime, uiOperflag);
                             }
                         }
                     }
@@ -166,7 +168,7 @@ int TryUseSkill(void *instance, int *state, int skillId, Vector3 dir, bool dirDe
         }
     }
     if (!isDoneAim) {
-        return orig_TryUseSkill(instance, state, skillId, dir, dirDefault, pos, bCommonAtk, bAuto, bAlong, bInQueue, isInFirstDragRange, firstTarget, keyState, bIgnoreQueue, dragTime, uiCastTime, uiOperflag);
+        return orig_ExecuteAttack(instance, location, state, skillId, dir, dirDefault, pos, bCommonAtk, bAuto, bAlong, bInQueue, isInFirstDragRange, firstTarget, 0u, false, nullptr, keyState, bIgnoreQueue, dragTime, false, 0, false, uiCastTime, uiOperflag);
     }
     return 0;
 }
@@ -219,13 +221,17 @@ void UpdateRetribution(void *instance) {
                                          || m_ID == 2002 && Aim.Helper.AutoRetribution.Lord  /*Lord*/
                                          || m_ID == 2003 && Aim.Helper.AutoRetribution.Turtle /*Turtle*/) {
                                             if (Vector3::Normalized(_Position - selfPos) != Vector3::zero()) {
-                                                // Crash #3 fix: pakai sig 16-param Battle.ShowUnitAIComp.TryUseSkill
+                                                // v2.1.88: ExecuteAttack menggantikan TryUseSkill (23-param)
                                                 int retState = 0;
-                                                orig_TryUseSkill(instance, &retState, 20020,
+                                                orig_ExecuteAttack(instance, 0, &retState, 20020,
                                                     Vector3::Normalized(_Position - selfPos),
                                                     true, Vector3::zero(),
                                                     false, false, false, false,
-                                                    false, 0u, 0, false, 0u, 0u, 0u);
+                                                    false, 0u,
+                                                    0u, false, nullptr,
+                                                    0, false, 0u,
+                                                    false, 0, false,
+                                                    0u, 0u);
                                             }
                                         }
                                     }
