@@ -67,27 +67,33 @@ int get_dpi() {
 }
 
 void ImGui_GetTouch(ImGuiIO* io, int screenHeight) {
-	void *instance;
+    // Unity Input is a static class — instance must be nullptr for IL2CPP static calls.
+    void *instance = nullptr;
     if (get_touchCount() > 0) {
-        if (get_touchSupported(instance)) {
-            UnityEngine_Touch_Fields touch = ((UnityEngine_Touch_Fields (*)(void *, int))(Input_GetTouch))(instance, 0);
-            switch (touch.m_Phase) {
-            case TouchPhase::Began:
-            case TouchPhase::Stationary:
-                io->MouseDown[0] = true;
-                ImGui::GetIO().MousePos = ImVec2(get_mousePosition(instance).x, screenHeight - get_mousePosition(instance).y);
-                break;
-            case TouchPhase::Ended:
-            case TouchPhase::Canceled:
-                io->MouseDown[0] = false;
-                clearMousePos = true;
-                break;
-            case TouchPhase::Moved:
-                ImGui::GetIO().MousePos = ImVec2(get_mousePosition(instance).x, screenHeight - get_mousePosition(instance).y);
-                break;
-            default:
-                break;
-            }
+        // get_touchSupported is also static; always pass nullptr.
+        UnityEngine_Touch_Fields touch = ((UnityEngine_Touch_Fields (*)(void *, int))(Input_GetTouch))(instance, 0);
+        Vector3 mousePos = get_mousePosition(instance);
+        switch (touch.m_Phase) {
+        case TouchPhase::Began:
+        case TouchPhase::Stationary:
+            io->MouseDown[0] = true;
+            io->MousePos = ImVec2(mousePos.x, screenHeight - mousePos.y);
+            break;
+        case TouchPhase::Moved:
+            // Keep button held during drag so ImGui can move the window.
+            io->MouseDown[0] = true;
+            io->MousePos = ImVec2(mousePos.x, screenHeight - mousePos.y);
+            break;
+        case TouchPhase::Ended:
+        case TouchPhase::Canceled:
+            io->MouseDown[0] = false;
+            clearMousePos = true;
+            break;
+        default:
+            break;
         }
+    } else {
+        // No fingers on screen — release mouse so ImGui doesn't stay stuck.
+        io->MouseDown[0] = false;
     }
 }

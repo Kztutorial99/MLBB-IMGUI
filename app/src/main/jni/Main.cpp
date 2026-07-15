@@ -150,7 +150,8 @@ if (!g_Initialized) {
 
     /*load window here*/
     ImGui::SetNextWindowSize(ImVec2((float) get_width() * 0.47f, (float) get_height() * 0.78f), ImGuiCond_Once);
-    if (ImGui::Begin("GAMING NAJMUL MLBB MOD"),0,ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse) {
+    // NOTE: flags are proper function arguments — do NOT use the comma operator here.
+    if (ImGui::Begin("GAMING NAJMUL MLBB MOD", nullptr, ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoCollapse)) {
         if(ImGui::BeginTabBar("Tab", ImGuiTabBarFlags_FittingPolicyScroll)) {
             if (ImGui::BeginTabItem("Visual Menu")) {
 
@@ -335,6 +336,7 @@ if (!g_Initialized) {
         }
 
     }
+    ImGui::End(); // Must ALWAYS be called after Begin(), regardless of Begin's return value.
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
