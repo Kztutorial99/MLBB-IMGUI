@@ -126,10 +126,11 @@ void UpdateMapHack(void *instance) {
                             SetMapEntityIconPos(BattleBridge_Instance, _Position, m_uGuid, true);
 						}
 						if (Config.Visual.HealthBar) {
-							auto SetBloodInvisibility = (void (*)(void *, int, bool, bool, bool)) (BattleBridge_SetBloodInvisibility);
+							// Bug#6 fix: SetBloodInvisibility punya 5 param: (uGuid, bflag, bDeath, isForce, IHidCallChain). Tambah void* callChain.
+auto SetBloodInvisibility = (void (*)(void *, int, bool, bool, bool, void*)) (BattleBridge_SetBloodInvisibility);
                             auto SynBloodAttr = (void (*)(void *, void *, bool)) (BattleBridge_SynBloodAttr);
                             auto UpdateBloodPos = (void (*)(void *, void *, bool)) (BattleBridge_UpdateBloodPos);
-							SetBloodInvisibility(BattleBridge_Instance, m_uGuid, true, m_bDeath, true);
+							SetBloodInvisibility(BattleBridge_Instance, m_uGuid, true, m_bDeath, true, nullptr);
                             SynBloodAttr(BattleBridge_Instance, Pawn, true);
                             UpdateBloodPos(BattleBridge_Instance, Pawn, true);
 						}
