@@ -363,7 +363,10 @@ void *main_thread(void *) {
 
     Tools::Hook((void *) dlsym_ex(m_EGL, "eglSwapBuffers"), (void *) _eglSwapBuffers, (void **) &orig_eglSwapBuffers);
 
-    Tools::Hook((void *) BattleManager_Update, (void *) UpdateMapHack, (void **) &orig_UpdateMapHack);
+    // Crash #1 fix: BattleManager.Update tidak ada di v2.1.88 -> offset 0
+    // Dobby hook ke 0x0 menyebabkan SIGSEGV 5 detik setelah load. Guard wajib.
+    { uintptr_t _bmu = BattleManager_Update;
+      if (_bmu) Tools::Hook((void *) _bmu, (void *) UpdateMapHack, (void **) &orig_UpdateMapHack); }
 
     Tools::Hook((void *) ShowUnitAIComp_TryUseSkill, (void *) TryUseSkill, (void **) &orig_TryUseSkill);
     Tools::Hook((void *) ShowUnitAIComp_Update, (void *) UpdateRetribution, (void **) &orig_UpdateRetribution);
