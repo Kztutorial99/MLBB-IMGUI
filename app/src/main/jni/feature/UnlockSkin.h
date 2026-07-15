@@ -226,7 +226,8 @@ DefineHook(void, SetPlayerData_, (uintptr_t thiz, uintptr_t playerinfo)) {
     return oSetPlayerData_(thiz, playerinfo);
 }
 
-DefineHook(void, AddPlayerInfo, (void * unk, uintptr_t playerinfo, uint selfCamp, uintptr_t roomdata, bool ignoreEmblem)) {
+// Bug#1 fix: AddPlayerInfo = STATIC -> tidak ada this-ptr. void* unk dihapus, semua param digeser balik.
+DefineHook(void, AddPlayerInfo, (uintptr_t playerinfo, uint selfCamp, uintptr_t roomdata, bool ignoreEmblem)) {
     if (ndUnlockSkin2) {
         if (m_SkinID) {
             if (!oIsHaveSkin(0, m_SkinID) || !oIsHaveSkinForever(0, m_SkinID)) {
@@ -241,10 +242,11 @@ DefineHook(void, AddPlayerInfo, (void * unk, uintptr_t playerinfo, uint selfCamp
             }
         }
     }
-    return oAddPlayerInfo(unk, playerinfo, selfCamp, roomdata, ignoreEmblem);
+    return oAddPlayerInfo(playerinfo, selfCamp, roomdata, ignoreEmblem);
 }
 
-DefineHook(void, AddPlayerInfo_, (void * unk, uintptr_t playerinfo, uintptr_t roomdata)) {
+// AddPlayerInfo_ (2-param) tidak ada di v2.1.88, hook di-guard. Fix sig juga.
+DefineHook(void, AddPlayerInfo_, (uintptr_t playerinfo, uintptr_t roomdata)) {
     if (ndUnlockSkin2) {
         if (m_SkinID) {
             if (!oIsHaveSkin(0, m_SkinID) || !oIsHaveSkinForever(0, m_SkinID)) {
@@ -259,7 +261,7 @@ DefineHook(void, AddPlayerInfo_, (void * unk, uintptr_t playerinfo, uintptr_t ro
             }
         }
     }
-    return oAddPlayerInfo_(unk, playerinfo, roomdata);
+    return oAddPlayerInfo_(playerinfo, roomdata);
 }
 
 // ==================================================================================================================================== //
