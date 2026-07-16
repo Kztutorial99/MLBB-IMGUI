@@ -126,22 +126,14 @@ void DrawMenu() {
     ImGui::SetNextWindowSize(window_size, ImGuiCond_Once);
     ImGui::Begin("FR LEGENDS MOD MENU", nullptr);
 
-    if (ImGui::BeginTabBar("FRL_Tabs")) {
-
-        if (ImGui::BeginTabItem("Player")) {
-            ImGui::Spacing();
-            ImGui::Text("[ PlayerData — Gold/Coin ]");
-            ImGui::Separator();
-            ImGui::Spacing();
-            ImGui::Checkbox("Buy Car Slot Gold = 0",  &IsGetBuySlotGold);
-            ImGui::Checkbox("Change Coin/Gold Bypass", &IsChangeCoinGold);
-            ImGui::Checkbox("Has Enough Money",        &IsHasEnoughMoney);
-            ImGui::Spacing();
-            ImGui::EndTabItem();
-        }
-
-        ImGui::EndTabBar();
-    }
+    ImGui::Spacing();
+    ImGui::Text("[ PlayerData — Gold/Coin ]");
+    ImGui::Separator();
+    ImGui::Spacing();
+    ImGui::Checkbox("Buy Car Slot Gold = 0",  &IsGetBuySlotGold);
+    ImGui::Checkbox("Change Coin/Gold Bypass", &IsChangeCoinGold);
+    ImGui::Checkbox("Has Enough Money",        &IsHasEnoughMoney);
+    ImGui::Spacing();
     ImGui::End();
 }
 
