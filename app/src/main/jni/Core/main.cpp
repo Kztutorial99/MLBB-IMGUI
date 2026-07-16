@@ -28,9 +28,6 @@ using namespace ImGui;
 // ABI   : arm64-v8a
 // ============================================================
 
-// Guard: imgui_go TIDAK boleh pakai Il2Cpp sampai ini true
-volatile bool il2cpp_ready = false;
-
 // ============================================================
 // Input hook (native level — tidak butuh Il2Cpp)
 // ============================================================
@@ -182,34 +179,28 @@ void *imgui_go(void*) {
 }
 
 // ============================================================
-// Thread 2: hook game functions via Il2Cpp
+// Thread 2: hook game functions — raw offset, TANPA Il2CppAttach
 // ============================================================
 void *hack_thread(void*) {
-    // Tunggu libil2cpp.so termuat
+    // Tunggu sampai libil2cpp.so termuat di /proc/maps
     do {
         libBaseAddress = findLibrary(LIB);
+        usleep(100000); // 100ms — beri waktu lib fully mapped
     } while (libBaseAddress == 0);
 
-    // Attach Il2Cpp — WAJIB sebelum panggil Il2CppGetMethodOffset
-    Il2CppAttach("libil2cpp.so");
-    sleep(3);
+    // Beri jeda 1 detik agar lib selesai inisialisasi sebelum kita hook
+    sleep(1);
 
-    // Tandai Il2Cpp sudah siap (dipakai thread lain jika perlu)
-    il2cpp_ready = true;
-
-    // PlayerData::GetBuySlotGold — 0x140A444
+    // Raw-offset hooks — tidak butuh Il2CppAttach
     DobbyHook((void*)getAbsoluteAddress(LIB, 0x140A444),
               (void*)GetBuySlotGold, (void**)&old_GetBuySlotGold);
 
-    // PlayerData::ChangeCoinGold — 0x140A234
     DobbyHook((void*)getAbsoluteAddress(LIB, 0x140A234),
               (void*)ChangeCoinGold, (void**)&old_ChangeCoinGold);
 
-    // PlayerData::HasEnoughMoney — 0x140A3C4
     DobbyHook((void*)getAbsoluteAddress(LIB, 0x140A3C4),
               (void*)HasEnoughMoney, (void**)&old_HasEnoughMoney);
 
-    // PlayerData::ChangeCoinGold overload 2 — 0x140A360
     DobbyHook((void*)getAbsoluteAddress(LIB, 0x140A360),
               (void*)ChangeCoinGold2, (void**)&old_ChangeCoinGold2);
 
