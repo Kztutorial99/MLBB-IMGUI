@@ -88,16 +88,34 @@ void SetupImgui(EGLDisplay dpy, EGLSurface surface) {
 }
 
 // ============================================================
-// FR Legends hooks
+// FR Legends hooks — PlayerData
 // ============================================================
 
-// PlayerData::GetBuySlotGold — offset 0x140a444 (arm64-v8a)
+// PlayerData::GetBuySlotGold — 0x140A444
 bool IsGetBuySlotGold = false;
-int (*old_GetBuySlotGold)(void* instance, void* method_info);
-int GetBuySlotGold(void* instance, void* method_info) {
-    if (instance != nullptr && IsGetBuySlotGold)
+int (*old_GetBuySlotGold)(void* instance);
+int GetBuySlotGold(void* instance) {
+    if (instance != NULL && IsGetBuySlotGold)
         return 0;
-    return old_GetBuySlotGold(instance, method_info);
+    return old_GetBuySlotGold(instance);
+}
+
+// PlayerData::ChangeCoinGold — 0x140A234
+bool IsChangeCoinGold = false;
+bool (*old_ChangeCoinGold)(void* instance, int dc, int dg);
+bool ChangeCoinGold(void* instance, int dc, int dg) {
+    if (instance != NULL && IsChangeCoinGold)
+        return true;
+    return old_ChangeCoinGold(instance, dc, dg);
+}
+
+// PlayerData::HasEnoughMoney — 0x140A3C4
+bool IsHasEnoughMoney = false;
+bool (*old_HasEnoughMoney)(void* instance, void* p);
+bool HasEnoughMoney(void* instance, void* p) {
+    if (instance != NULL && IsHasEnoughMoney)
+        return true;
+    return old_HasEnoughMoney(instance, p);
 }
 
 // ============================================================
@@ -112,10 +130,12 @@ void DrawMenu() {
 
         if (ImGui::BeginTabItem("Player")) {
             ImGui::Spacing();
-            ImGui::Text("[ Player Data ]");
+            ImGui::Text("[ PlayerData — Gold/Coin ]");
             ImGui::Separator();
             ImGui::Spacing();
-            ImGui::Checkbox("Buy Car Slot Gold = 0", &IsGetBuySlotGold);
+            ImGui::Checkbox("Buy Car Slot Gold = 0",  &IsGetBuySlotGold);
+            ImGui::Checkbox("Change Coin/Gold Bypass", &IsChangeCoinGold);
+            ImGui::Checkbox("Has Enough Money",        &IsHasEnoughMoney);
             ImGui::Spacing();
             ImGui::EndTabItem();
         }
@@ -181,14 +201,17 @@ void *hack_thread(void*) {
     // Tandai Il2Cpp sudah siap (dipakai thread lain jika perlu)
     il2cpp_ready = true;
 
-    // Hook PlayerData::GetBuySlotGold
-    void* offset_GetBuySlotGold = Il2CppGetMethodOffset(
-        "Assembly-CSharp.dll", "", "PlayerData", "GetBuySlotGold", 0);
-    if (offset_GetBuySlotGold) {
-        DobbyHook(offset_GetBuySlotGold,
-                  (void*)GetBuySlotGold,
-                  (void**)&old_GetBuySlotGold);
-    }
+    // PlayerData::GetBuySlotGold — 0x140A444
+    DobbyHook((void*)getAbsoluteAddress(LIB, 0x140A444),
+              (void*)GetBuySlotGold, (void**)&old_GetBuySlotGold);
+
+    // PlayerData::ChangeCoinGold — 0x140A234
+    DobbyHook((void*)getAbsoluteAddress(LIB, 0x140A234),
+              (void*)ChangeCoinGold, (void**)&old_ChangeCoinGold);
+
+    // PlayerData::HasEnoughMoney — 0x140A3C4
+    DobbyHook((void*)getAbsoluteAddress(LIB, 0x140A3C4),
+              (void*)HasEnoughMoney, (void**)&old_HasEnoughMoney);
 
     pthread_exit(nullptr);
 }
