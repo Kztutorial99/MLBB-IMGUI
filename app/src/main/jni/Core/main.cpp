@@ -1,6 +1,7 @@
 #include <jni.h>
 #include <pthread.h>
 #include <android/input.h>
+#include <android/log.h>
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -8,6 +9,10 @@
 #include <sys/system_properties.h>
 #include <GLES3/gl3.h>
 #include <EGL/egl.h>
+
+#define LOG_TAG "FRL_HACK"
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 #include "xdl.h"
 #include "dobby.h"
@@ -177,29 +182,50 @@ void *imgui_go(void*) {
 // Thread 2: hook game functions via Il2Cpp
 // ============================================================
 void *hack_thread(void*) {
-    // Tunggu libil2cpp.so termuat
+    // Tunggu libil2cpp.so termuat — pakai usleep agar tidak bakar CPU
+    LOGI("[*] Waiting for %s ...", LIB);
     do {
         libBaseAddress = findLibrary(LIB);
+        usleep(200000); // 200ms
     } while (libBaseAddress == 0);
+    LOGI("[+] %s base: 0x%lx", LIB, (unsigned long)libBaseAddress);
 
-    // Attach Il2Cpp — WAJIB sebelum panggil Il2CppGetMethodOffset
     Il2CppAttach("libil2cpp.so");
     sleep(3);
-
-    // Tandai Il2Cpp sudah siap (dipakai thread lain jika perlu)
     il2cpp_ready = true;
 
-    // PlayerData::GetBuySlotGold — 0x140A444
-    DobbyHook((void*)getAbsoluteAddress(LIB, 0x140A444),
-              (void*)GetBuySlotGold, (void**)&old_GetBuySlotGold);
+    // ---- Hitung semua address sekaligus ----
+    uintptr_t addr_GetBuySlotGold  = getAbsoluteAddress(LIB, 0x140A444);
+    uintptr_t addr_ChangeCoinGold  = getAbsoluteAddress(LIB, 0x140A234);
+    uintptr_t addr_HasEnoughMoney  = getAbsoluteAddress(LIB, 0x140A3C4);
 
-    // PlayerData::ChangeCoinGold — 0x140A234
-    DobbyHook((void*)getAbsoluteAddress(LIB, 0x140A234),
-              (void*)ChangeCoinGold, (void**)&old_ChangeCoinGold);
+    LOGI("[*] GetBuySlotGold  @ 0x%lx", (unsigned long)addr_GetBuySlotGold);
+    LOGI("[*] ChangeCoinGold  @ 0x%lx", (unsigned long)addr_ChangeCoinGold);
+    LOGI("[*] HasEnoughMoney  @ 0x%lx", (unsigned long)addr_HasEnoughMoney);
 
-    // PlayerData::HasEnoughMoney — 0x140A3C4
-    DobbyHook((void*)getAbsoluteAddress(LIB, 0x140A3C4),
-              (void*)HasEnoughMoney, (void**)&old_HasEnoughMoney);
+    // ---- Guard: jangan DobbyHook ke address 0 ----
+    if (!addr_GetBuySlotGold || !addr_ChangeCoinGold || !addr_HasEnoughMoney) {
+        LOGE("[-] Salah satu address = 0! Offset mungkin salah. Abort hook.");
+        pthread_exit(nullptr);
+    }
+
+    // ---- DobbyHook + cek return value (0 = sukses) ----
+    int r1 = DobbyHook((void*)addr_GetBuySlotGold,
+                       (void*)GetBuySlotGold, (void**)&old_GetBuySlotGold);
+    LOGI("[%s] GetBuySlotGold  hook: %d", r1 == 0 ? "+" : "-", r1);
+
+    int r2 = DobbyHook((void*)addr_ChangeCoinGold,
+                       (void*)ChangeCoinGold, (void**)&old_ChangeCoinGold);
+    LOGI("[%s] ChangeCoinGold  hook: %d", r2 == 0 ? "+" : "-", r2);
+
+    int r3 = DobbyHook((void*)addr_HasEnoughMoney,
+                       (void*)HasEnoughMoney, (void**)&old_HasEnoughMoney);
+    LOGI("[%s] HasEnoughMoney  hook: %d", r3 == 0 ? "+" : "-", r3);
+
+    if (r1 == 0 && r2 == 0 && r3 == 0)
+        LOGI("[+] Semua hook berhasil dipasang!");
+    else
+        LOGE("[-] Ada hook yang gagal — cek offset atau versi game!");
 
     pthread_exit(nullptr);
 }
