@@ -1,4 +1,4 @@
-name: Build FR Legends ImGui APK
+name: Build FR Legends libTool.so
 
 on:
   push:
@@ -8,38 +8,53 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Setup JDK 17
-        uses: actions/setup-java@v4
+      - name: Setup Android NDK 25
+        uses: nttld/setup-ndk@v1
         with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: gradle
+          ndk-version: r25c
+          add-to-path: true
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install NDK 25
-        run: sdkmanager "ndk;25.2.9519653"
-
-      - name: Make gradlew executable
-        run: chmod +x gradlew
-
-      - name: Build Release APK
-        run: ./gradlew assembleRelease --stacktrace
-
-      - name: Rename APK
+      - name: Build libTool.so (ndk-build)
         run: |
-          mkdir -p out
-          cp app/build/outputs/apk/release/*.apk out/FRLegendsImGui.apk
+          ndk-build \
+            NDK_PROJECT_PATH=$GITHUB_WORKSPACE/app/src/main/jni \
+            APP_BUILD_SCRIPT=$GITHUB_WORKSPACE/app/src/main/jni/Android.mk \
+            NDK_APPLICATION_MK=$GITHUB_WORKSPACE/app/src/main/jni/Application.mk \
+            NDK_OUT=$GITHUB_WORKSPACE/obj \
+            NDK_LIBS_OUT=$GITHUB_WORKSPACE/libs
+          echo "=== Build Output ==="
+          find $GITHUB_WORKSPACE/libs -name "*.so" | sort
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - name: Collect .so files
+        run: |
+          mkdir -p release_out
+          find $GITHUB_WORKSPACE/libs -name "libTool.so" -exec cp {} release_out/ \;
+          ls -lh release_out/
+
+      - name: Get short SHA
+        id: sha
+        run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release & Upload .so
+        uses: softprops/action-gh-release@v2
         with:
-          name: FRLegendsImGui
-          path: out/FRLegendsImGui.apk
-          retention-days: 30
+          tag_name: build-${{ steps.sha.outputs.SHORT_SHA }}
+          name: "FR Legends ImGui | build-${{ steps.sha.outputs.SHORT_SHA }}"
+          body: |
+            ## FR Legends ImGui — libTool.so
+
+            **Game:** com.fengiiley.frlegends  
+            **ABI:** arm64-v8a, armeabi-v7a  
+            **Commit:** ${{ steps.sha.outputs.SHORT_SHA }}
+
+            Lihat `CARA_SETUP.txt` di repo untuk cara inject ke APK game.
+          files: release_out/libTool.so
+          draft: false
+          prerelease: false

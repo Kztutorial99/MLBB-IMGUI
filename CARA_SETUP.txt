@@ -1,0 +1,81 @@
+====================================================
+  FR Legends ImGui — Cara Inject libTool.so ke APK
+====================================================
+Game    : com.fengiiley.frlegends
+Library : libTool.so
+ABI     : arm64-v8a
+
+TOOLS YANG DIBUTUHKAN
+---------------------
+1. MT Manager (Android) — bisa download di mtmanager.fun
+2. APK asli FR Legends (dari Play Store / APKPure)
+3. libTool.so (download dari GitHub Releases repo ini)
+
+====================================================
+LANGKAH-LANGKAH
+====================================================
+
+[ STEP 1 — Buka APK dengan MT Manager ]
+1. Buka MT Manager
+2. Di panel kiri → navigasi ke APK FR Legends
+   (biasanya di /data/app/com.fengiiley.frlegends-.../base.apk
+    atau download dulu dari APKPure simpan di /sdcard/)
+3. Long-press APK → "Open with..." → "APK Editor"
+
+[ STEP 2 — Masuk ke folder lib ]
+1. Di dalam APK Editor, buka folder:
+   lib/arm64-v8a/
+2. Kamu akan lihat file-file .so bawaan game (libil2cpp.so, dll.)
+
+[ STEP 3 — Inject libTool.so ]
+1. Di panel kanan MT Manager, navigasi ke folder
+   tempat kamu simpan libTool.so
+2. Long-press libTool.so → Copy
+3. Kembali ke panel kiri (lib/arm64-v8a/ di dalam APK)
+4. Paste → libTool.so sekarang ada di dalam APK
+
+[ STEP 4 — Edit AndroidManifest (opsional tapi direkomendasikan) ]
+Jika mau mod menu muncul otomatis saat game dibuka,
+tidak perlu edit manifest. libTool.so di-load otomatis
+karena menggunakan __attribute__((constructor)).
+
+[ STEP 5 — Sign & Install APK ]
+1. Di MT Manager APK Editor → klik "Save" / "Build"
+   → APK baru akan dibuat (unsigned)
+2. Setelah APK selesai dibuild:
+   - Klik APK hasil → "Sign" → pilih keystore kamu
+     (atau pakai fitur auto-sign MT Manager)
+3. Install APK yang sudah disign
+4. Buka FR Legends → mod menu ImGui akan muncul
+   sebagai overlay di dalam game
+
+====================================================
+CATATAN PENTING
+====================================================
+- Pastikan uninstall FR Legends asli dulu sebelum
+  install APK yang sudah dimodif (signature berbeda)
+- Jika device punya Play Protect, disable dulu
+  Settings → Security → Play Protect → Disable
+- Mod menu muncul sebagai floating window di atas game
+- __attribute__((constructor)) = auto-load saat .so dimuat
+- libTool.so hanya untuk arm64-v8a (HP 64-bit)
+
+====================================================
+TROUBLESHOOT
+====================================================
+Q: Game crash saat dibuka?
+A: Kemungkinan offset salah atau game sudah update.
+   Cek versi game dan sesuaikan offset di source code.
+
+Q: Mod menu tidak muncul?
+A: Pastikan libTool.so benar-benar ada di lib/arm64-v8a/
+   di dalam APK. Cek lagi dengan MT Manager.
+
+Q: "App not installed"?
+A: APK belum disign atau signature bentrok.
+   Uninstall game lama → sign ulang → install lagi.
+
+====================================================
+  Dibuat oleh: Kztutorial99
+  Repo: github.com/Kztutorial99/MLBB-IMGUI
+====================================================
