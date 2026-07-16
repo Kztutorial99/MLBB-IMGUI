@@ -1,3 +1,4 @@
+#pragma once
 #include <stdio.h>
 #include <unistd.h>
 #include <stdint.h>
@@ -87,7 +88,7 @@ uintptr_t getAbsoluteAddress(const char *libraryName, uintptr_t relativeAddr) {
     return libBase + relativeAddr;
 }
 
-#define LIB "liblogic.so"
+#define LIB "libil2cpp.so"
 
 #define gAA getAbsoluteAddress
 
