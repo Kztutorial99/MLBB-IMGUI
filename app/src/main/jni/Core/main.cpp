@@ -125,10 +125,10 @@ void DrawMenu() {
     ImGui::Begin("FR LEGENDS MOD MENU", nullptr);
 
     ImGui::Spacing();
-    ImGui::Text("[ PlayerData — Gold/Coin ]");
+    ImGui::Text("[ PlayerData Gold/Coin ]");
     ImGui::Separator();
     ImGui::Spacing();
-    ImGui::Checkbox("Buy Car Slot Gold = 0",  &IsGetBuySlotGold);
+    ImGui::Checkbox("Buy Car Slot Gold = 0", &IsGetBuySlotGold);
     ImGui::Spacing();
     ImGui::End();
 }
@@ -177,34 +177,29 @@ void *imgui_go(void*) {
 // Thread 2: hook game functions via Il2Cpp
 // ============================================================
 void *hack_thread(void*) {
-    // Tunggu libil2cpp.so termuat — usleep 200ms agar tidak bakar CPU
+    // Tunggu libil2cpp.so termuat
     do {
         libBaseAddress = findLibrary(LIB);
-        usleep(200000);
     } while (libBaseAddress == 0);
 
-    // LOGI tersedia via Include.h -> Tools.h -> Includes.h (tidak perlu redefine)
-    LOGI("[FRL] libil2cpp base: 0x%lx", (unsigned long)libBaseAddress);
-
+    // Attach Il2Cpp — WAJIB sebelum panggil Il2CppGetMethodOffset
     Il2CppAttach("libil2cpp.so");
     sleep(3);
+
+    // Tandai Il2Cpp sudah siap (dipakai thread lain jika perlu)
     il2cpp_ready = true;
 
-    uintptr_t a1 = getAbsoluteAddress(LIB, 0x140A444);
-    uintptr_t a2 = getAbsoluteAddress(LIB, 0x140A234);
-    uintptr_t a3 = getAbsoluteAddress(LIB, 0x140A3C4);
-    LOGI("[FRL] GetBuySlotGold=0x%lx ChangeCoinGold=0x%lx HasEnoughMoney=0x%lx",
-         (unsigned long)a1, (unsigned long)a2, (unsigned long)a3);
+    // PlayerData::GetBuySlotGold — 0x140A444
+    DobbyHook((void*)getAbsoluteAddress(LIB, 0x140A444),
+              (void*)GetBuySlotGold, (void**)&old_GetBuySlotGold);
 
-    if (!a1 || !a2 || !a3) {
-        LOGI("[FRL] ERROR addr=0: libil2cpp tidak load atau offset salah!");
-        pthread_exit(nullptr);
-    }
+    // PlayerData::ChangeCoinGold — 0x140A234
+    DobbyHook((void*)getAbsoluteAddress(LIB, 0x140A234),
+              (void*)ChangeCoinGold, (void**)&old_ChangeCoinGold);
 
-    int r1 = DobbyHook((void*)a1, (void*)GetBuySlotGold,  (void**)&old_GetBuySlotGold);
-    int r2 = DobbyHook((void*)a2, (void*)ChangeCoinGold,  (void**)&old_ChangeCoinGold);
-    int r3 = DobbyHook((void*)a3, (void*)HasEnoughMoney,  (void**)&old_HasEnoughMoney);
-    LOGI("[FRL] DobbyHook r1=%d r2=%d r3=%d (0=sukses,-1=gagal)", r1, r2, r3);
+    // PlayerData::HasEnoughMoney — 0x140A3C4
+    DobbyHook((void*)getAbsoluteAddress(LIB, 0x140A3C4),
+              (void*)HasEnoughMoney, (void**)&old_HasEnoughMoney);
 
     pthread_exit(nullptr);
 }
