@@ -108,6 +108,14 @@ bool ChangeCoinGold(void* instance, int dc, int dg) {
     return old_ChangeCoinGold(instance, dc, dg);
 }
 
+// PlayerData::ChangeCoinGold overload 2 — 0x140A360
+bool (*old_ChangeCoinGold2)(void* instance, void* p);
+bool ChangeCoinGold2(void* instance, void* p) {
+    if (instance != NULL && IsGetBuySlotGold)
+        return true;
+    return old_ChangeCoinGold2(instance, p);
+}
+
 // PlayerData::HasEnoughMoney — 0x140A3C4
 bool (*old_HasEnoughMoney)(void* instance, void* p);
 bool HasEnoughMoney(void* instance, void* p) {
@@ -200,6 +208,10 @@ void *hack_thread(void*) {
     // PlayerData::HasEnoughMoney — 0x140A3C4
     DobbyHook((void*)getAbsoluteAddress(LIB, 0x140A3C4),
               (void*)HasEnoughMoney, (void**)&old_HasEnoughMoney);
+
+    // PlayerData::ChangeCoinGold overload 2 — 0x140A360
+    DobbyHook((void*)getAbsoluteAddress(LIB, 0x140A360),
+              (void*)ChangeCoinGold2, (void**)&old_ChangeCoinGold2);
 
     pthread_exit(nullptr);
 }
