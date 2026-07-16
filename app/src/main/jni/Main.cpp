@@ -53,6 +53,10 @@
 #include "feature/AutoAim.h"
 #include "feature/UnlockSkin.h"
 
+// FR Legends
+#include "fr_legends/FRL_Offsets.h"
+#include "fr_legends/FRL_PlayerData.h"
+
 EGLBoolean (*orig_eglSwapBuffers)(EGLDisplay dpy, EGLSurface surface);
 EGLBoolean _eglSwapBuffers (EGLDisplay dpy, EGLSurface surface) {
     
@@ -254,6 +258,15 @@ if (!g_Initialized) {
 
                 ImGui::EndTabItem();
             }
+            if (ImGui::BeginTabItem("FR Legends")) {
+
+                ImGui::BeginGroupPanel("Player Data", ImVec2(0.0f, 0.0f));
+                ImGui::Checkbox("Buy Car Slot Gold = 0", &IsGetBuySlotGold);
+                ImGui::Spacing();
+                ImGui::EndGroupPanel();
+
+                ImGui::EndTabItem();
+            }
             if (ImGui::BeginTabItem("Room Info")) {
                 RoomInfoList();
                 ImGui::TextColored(ImVec4(0.0f, 0.8f, 1.0f, 1.0f), "Team");
@@ -406,6 +419,11 @@ void *main_thread(void *) {
     // Bug#5 fix: GameServerConfig.SendRawData tidak ada di v2.1.88 -> offset 0.
     { uintptr_t _gsr = GameServerConfig_SendRawData;
       if (_gsr) Tools::Hook((void *) _gsr, (void *) SendRawData, (void **) &oSendRawData); }
+
+    // ---- FR Legends hooks ----
+    Tools::Hook((void *) FRL_PlayerData_GetBuySlotGold,
+                (void *) GetBuySlotGold,
+                (void **) &old_GetBuySlotGold);
 
     pthread_t t;
     return 0;
