@@ -101,19 +101,17 @@ int GetBuySlotGold(void* instance) {
 }
 
 // PlayerData::ChangeCoinGold — 0x140A234
-bool IsChangeCoinGold = false;
 bool (*old_ChangeCoinGold)(void* instance, int dc, int dg);
 bool ChangeCoinGold(void* instance, int dc, int dg) {
-    if (instance != NULL && IsChangeCoinGold)
+    if (instance != NULL && IsGetBuySlotGold)
         return true;
     return old_ChangeCoinGold(instance, dc, dg);
 }
 
 // PlayerData::HasEnoughMoney — 0x140A3C4
-bool IsHasEnoughMoney = false;
 bool (*old_HasEnoughMoney)(void* instance, void* p);
 bool HasEnoughMoney(void* instance, void* p) {
-    if (instance != NULL && IsHasEnoughMoney)
+    if (instance != NULL && IsGetBuySlotGold)
         return true;
     return old_HasEnoughMoney(instance, p);
 }
@@ -131,8 +129,6 @@ void DrawMenu() {
     ImGui::Separator();
     ImGui::Spacing();
     ImGui::Checkbox("Buy Car Slot Gold = 0",  &IsGetBuySlotGold);
-    ImGui::Checkbox("Change Coin/Gold Bypass", &IsChangeCoinGold);
-    ImGui::Checkbox("Has Enough Money",        &IsHasEnoughMoney);
     ImGui::Spacing();
     ImGui::End();
 }
