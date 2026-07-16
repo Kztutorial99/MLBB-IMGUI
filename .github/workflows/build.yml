@@ -23,8 +23,8 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install NDK 24
-        run: sdkmanager "ndk;24.0.8215888"
+      - name: Install NDK 25
+        run: sdkmanager "ndk;25.2.9519653"
 
       - name: Make gradlew executable
         run: chmod +x gradlew
